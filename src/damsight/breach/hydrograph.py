@@ -372,7 +372,7 @@ def generate_breach_hydrograph(
 def get_dam_breach_inputs(
     dam: Any,
     allow_unverified: bool = False,
-    fallbacks: dict[str, float] | None = None,
+    site: Any | None = None,
 ) -> dict[str, Any]:
     """Single designated route from a SiteConfig dam to breach and solver inputs.
 
@@ -380,4 +380,4 @@ def get_dam_breach_inputs(
     """
     from damsight.config import consume_dam_parameters
 
-    return consume_dam_parameters(dam, allow_unverified=allow_unverified, fallbacks=fallbacks)
+    return consume_dam_parameters(dam, allow_unverified=allow_unverified, site=site)

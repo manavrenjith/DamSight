@@ -13,7 +13,7 @@ from damsight.breach.hydrograph import StageStorageCurve, generate_breach_hydrog
 def plot_hydrograph(
     reservoir_volume_m3: float = 2.5e7,
     breach_height_m: float = 30.0,
-    water_depth_m: float = 27.5,
+    water_depth_m: float = 30.0,
     crest_elevation_m: float = 85.0,
     cd_rect: float = 1.70,
     cd_tri: float = 1.35,
@@ -115,21 +115,41 @@ def plot_hydrograph(
     # 1. Hydrograph Discharge Q(t)
     ax1 = axes[0]
     ax1.plot(time_hr, res.discharge_m3s, color="#1f77b4", lw=2, label="Hydrograph Outflow Q(t)")
+
+    # Froehlich empirical Qp comparisons
+    qp_30 = 0.607 * (reservoir_volume_m3**0.295) * (breach_height_m**1.24)
+    qp_hw = 0.607 * (reservoir_volume_m3**0.295) * (water_depth_m**1.24)
+    ratio_30 = res.peak_discharge_hydrograph_m3s / qp_30 if qp_30 > 0 else 0.0
+
     ax1.axhline(
-        params.empirical_peak_qp_m3s,
+        qp_30,
         color="#d62728",
         ls="--",
-        label=f"Froehlich (1995) Empirical Q_p ({params.empirical_peak_qp_m3s:.1f} m³/s)",
+        lw=1.5,
+        label=f"Froehlich (1995) Q_p (h_w=30m: {qp_30:.0f} m³/s, ratio={ratio_30:.2f}x)",
     )
+    if abs(qp_hw - qp_30) > 10.0:
+        ratio_hw = res.peak_discharge_hydrograph_m3s / qp_hw if qp_hw > 0 else 0.0
+        ax1.axhline(
+            qp_hw,
+            color="#9467bd",
+            ls=":",
+            lw=1.5,
+            label=f"Froehlich (1995) Q_p (h_w={water_depth_m:.1f}m: {qp_hw:.0f} m³/s, ratio={ratio_hw:.2f}x)",
+        )
+
     peak_idx = int(np.argmax(res.discharge_m3s))
-    ax1.scatter([time_hr[peak_idx]], [res.peak_discharge_hydrograph_m3s], color="#2ca02c", zorder=5)
+    ax1.scatter([time_hr[peak_idx]], [res.peak_discharge_hydrograph_m3s], color="#2ca02c", s=40, zorder=5)
     ax1.annotate(
-        f"Peak: {res.peak_discharge_hydrograph_m3s:.1f} m³/s\n@ {time_hr[peak_idx]:.2f} hr",
+        f"Simulated Peak: {res.peak_discharge_hydrograph_m3s:.1f} m³/s\n"
+        f"@ t = {time_hr[peak_idx]:.2f} hr\n"
+        f"Ratio to Q_p(30m): {ratio_30:.2f}x",
         xy=(time_hr[peak_idx], res.peak_discharge_hydrograph_m3s),
-        xytext=(time_hr[peak_idx] + 0.3, res.peak_discharge_hydrograph_m3s * 0.85),
-        arrowprops={"facecolor": "black", "shrink": 0.05, "width": 1, "headwidth": 6},
-        fontsize=9,
+        xytext=(time_hr[peak_idx] + 0.35, res.peak_discharge_hydrograph_m3s * 0.92),
+        arrowprops={"facecolor": "#2ca02c", "edgecolor": "#1b611b", "shrink": 0.05, "width": 1.2, "headwidth": 6},
+        fontsize=8.5,
         fontweight="bold",
+        bbox={"boxstyle": "round,pad=0.35", "facecolor": "#f0fff0", "edgecolor": "#2ca02c", "alpha": 0.95},
     )
     ax1.set_ylabel("Discharge (m³/s)", fontsize=11)
     ax1.set_title(
@@ -139,7 +159,7 @@ def plot_hydrograph(
         pad=15,
     )
     ax1.grid(True, alpha=0.3)
-    ax1.legend(loc="upper right", frameon=True)
+    ax1.legend(loc="upper right", frameon=True, fontsize=8.5)
 
     # 2. Reservoir Water Surface Stage H(t)
     ax2 = axes[1]
@@ -195,7 +215,7 @@ def main():
     )
     parser.add_argument("--vw", type=float, default=2.5e7, help="Reservoir volume (m3)")
     parser.add_argument("--hb", type=float, default=30.0, help="Breach height (m)")
-    parser.add_argument("--hw", type=float, default=27.5, help="Water depth (m)")
+    parser.add_argument("--hw", type=float, default=30.0, help="Water depth (m)")
     parser.add_argument("--crest", type=float, default=85.0, help="Crest elevation (m)")
     args = parser.parse_args()
 

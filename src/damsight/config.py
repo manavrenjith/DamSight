@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 
 class UnverifiedValueWarning(UserWarning):
@@ -110,12 +110,20 @@ class DamItemConfig(BaseModel):
     source: str | None = None
     verified: bool | None = None
     unverified_parameters: list[str] = Field(default_factory=list, exclude=True)
+    parameter_sources: dict[str, str] = Field(default_factory=dict, exclude=True)
+    _site_id: str = PrivateAttr(default="")
+    _site_name: str = PrivateAttr(default="")
 
     @model_validator(mode="before")
     @classmethod
     def track_unverified(cls, data: Any) -> Any:
         if isinstance(data, dict):
             unverified: list[str] = []
+            param_sources: dict[str, str] = {}
+            dam_src = data.get("source")
+            if dam_src and not is_todo_value(str(dam_src)):
+                param_sources["_dam"] = str(dam_src)
+
             for key in (
                 "crest_elevation_m",
                 "dam_height_m",
@@ -123,13 +131,15 @@ class DamItemConfig(BaseModel):
                 "spillway_capacity_m3s",
             ):
                 raw = data.get(key)
-                if (
-                    isinstance(raw, dict)
-                    and raw.get("verified") is False
-                    or isinstance(raw, str)
-                    and is_todo_value(raw)
-                ):
+                if isinstance(raw, dict):
+                    if raw.get("verified") is False:
+                        unverified.append(key)
+                    field_src = raw.get("source")
+                    if field_src and not is_todo_value(str(field_src)):
+                        param_sources[key] = str(field_src)
+                elif isinstance(raw, str) and is_todo_value(raw):
                     unverified.append(key)
+
             if data.get("verified") is False:
                 unverified.extend(
                     [
@@ -140,23 +150,45 @@ class DamItemConfig(BaseModel):
                     ]
                 )
             data["unverified_parameters"] = list(set(unverified))
+            data["parameter_sources"] = param_sources
         return data
+
+    @property
+    def is_synthetic(self) -> bool:
+        """Return True if this dam belongs to a synthetic test fixture."""
+        s_id = (self._site_id or "").upper()
+        s_name = (self._site_name or "").upper()
+        d_id = (self.id or "").upper()
+        d_source = (self.source or "").upper()
+        if "SYNTHETIC" in s_id and "SYNTHETIC" in s_name:
+            return True
+        if "SYNTHETIC" in d_id and ("SYNTHETIC" in s_id or "SYNTHETIC" in s_name or "SYNTHETIC" in d_source):
+            return True
+        return False
 
     def consume_physical_parameter(
         self,
         field_name: str,
         allow_unverified: bool = False,
-        fallback_value: float | None = None,
-    ) -> tuple[float, str]:
+    ) -> tuple[float, str, list[str]]:
         """Consume a physical parameter, enforcing allow_unverified guard.
 
-        Raises ValueError if unverified and allow_unverified is False.
-        Returns (numeric_value, data_status).
+        Rules:
+        a) A value that is TODO_VERIFY always raises ValueError, even with allow_unverified=True.
+        b) A numeric value with verified:false and a source passes only with allow_unverified=True;
+           the returned metadata carries data_status="unverified" plus the source list.
+        c) If synthetic values are needed, they come only from a fixture whose site_id and name
+           contain SYNTHETIC, and the returned metadata says data_status="synthetic".
         """
         val = getattr(self, field_name)
+        if is_todo_value(val):
+            raise ValueError(
+                f"Physical parameter '{field_name}' on dam '{self.id}' is a placeholder '{val}' (TODO_VERIFY). "
+                "Values marked TODO_VERIFY always raise and cannot be consumed, even with allow_unverified=True."
+            )
+
         is_unverified = (
-            is_todo_value(val)
-            or (field_name in self.unverified_parameters)
+            (field_name in self.unverified_parameters)
             or (self.verified is False)
         )
         if is_unverified:
@@ -165,14 +197,21 @@ class DamItemConfig(BaseModel):
                     f"Physical parameter '{field_name}' on dam '{self.id}' is unverified ({val}). "
                     "Must pass allow_unverified=True to consume unverified physical values."
                 )
-            if is_todo_value(val):
-                if fallback_value is None:
-                    raise ValueError(
-                        f"Physical parameter '{field_name}' is placeholder '{val}' and no fallback value was provided."
-                    )
-                return float(fallback_value), "unverified"
-            return float(val), "unverified"
-        return float(val), "verified"
+            src = self.parameter_sources.get(field_name) or self.parameter_sources.get("_dam") or self.source
+            if not src or is_todo_value(src):
+                raise ValueError(
+                    f"Physical parameter '{field_name}' on dam '{self.id}' is marked verified:false but has no valid source citation. "
+                    "A numeric value with verified:false requires a cited source to be consumed with allow_unverified=True."
+                )
+            return float(val), "unverified", [str(src)]
+
+        # Synthetic fixture detection
+        if self.is_synthetic:
+            sources = [self.source] if self.source and not is_todo_value(self.source) else []
+            return float(val), "synthetic", sources
+
+        sources = [self.source] if self.source and not is_todo_value(self.source) else []
+        return float(val), "verified", sources
 
     @field_validator("location", mode="before")
     @classmethod
@@ -344,6 +383,11 @@ class SiteConfig(BaseModel):
     ensemble: EnsembleConfig
     evacuation: EvacuationConfig
 
+    def model_post_init(self, __context: Any) -> None:
+        for dam in self.dams:
+            dam._site_id = self.site_id
+            dam._site_name = self.name
+
     @field_validator("name", mode="after")
     @classmethod
     def check_site_name(cls, v: str) -> str:
@@ -446,34 +490,48 @@ def load_site_config(source: str | Path | dict) -> SiteConfig:
 def consume_dam_parameters(
     dam: DamItemConfig,
     allow_unverified: bool = False,
-    fallbacks: dict[str, float] | None = None,
+    site: SiteConfig | None = None,
 ) -> dict[str, Any]:
     """Consume physical parameters for dam breach/simulation, enforcing allow_unverified guard.
 
-    Raises ValueError if any parameter is unverified and allow_unverified is False.
-    Returns dictionary with data_status='unverified' when allow_unverified is True.
+    Rules:
+    a) A value that is TODO_VERIFY always raises, even with allow_unverified=True.
+    b) A numeric value with verified:false and a source passes only with allow_unverified=True;
+       the returned metadata carries data_status="unverified" plus the source list.
+    c) If synthetic values are needed, they come only from a fixture whose site_id and name contain
+       SYNTHETIC, and the returned metadata says data_status="synthetic".
     """
-    fallbacks = fallbacks or {}
-    h_b, s1 = dam.consume_physical_parameter(
+    if site is not None:
+        dam._site_id = site.site_id
+        dam._site_name = site.name
+
+    h_b, s1, src1 = dam.consume_physical_parameter(
         "dam_height_m",
         allow_unverified=allow_unverified,
-        fallback_value=fallbacks.get("dam_height_m"),
     )
-    v_w, s2 = dam.consume_physical_parameter(
+    v_w, s2, src2 = dam.consume_physical_parameter(
         "reservoir_volume_m3",
         allow_unverified=allow_unverified,
-        fallback_value=fallbacks.get("reservoir_volume_m3"),
     )
-    crest_z, s3 = dam.consume_physical_parameter(
+    crest_z, s3, src3 = dam.consume_physical_parameter(
         "crest_elevation_m",
         allow_unverified=allow_unverified,
-        fallback_value=fallbacks.get("crest_elevation_m"),
     )
-    status = "unverified" if any(s == "unverified" for s in (s1, s2, s3)) else "verified"
+
+    all_sources = list(dict.fromkeys(s for s in (src1 + src2 + src3) if s))
+
+    if any(s == "unverified" for s in (s1, s2, s3)):
+        status = "unverified"
+    elif any(s == "synthetic" for s in (s1, s2, s3)):
+        status = "synthetic"
+    else:
+        status = "verified"
+
     return {
         "dam_id": dam.id,
         "dam_height_m": h_b,
         "reservoir_volume_m3": v_w,
         "crest_elevation_m": crest_z,
         "data_status": status,
+        "sources": all_sources,
     }

@@ -127,6 +127,9 @@ def test_valid_v2_verified_config_passes_cleanly(valid_v2_verified_config_dict):
     dam2 = config.get_dam("SYNTHETIC_TEST_DAM_2")
     assert dam2.id == "SYNTHETIC_TEST_DAM_2"
     assert dam2.dam_height_m == 24.3
+    dam2_inputs = consume_dam_parameters(dam2)
+    assert dam2_inputs["dam_height_m"] == 24.3
+    assert dam2_inputs["data_status"] == "synthetic"
     assert config.solver.baseline == "anuga"
     assert config.is_fully_verified is True
     assert len(config.get_unverified_fields()) == 0
@@ -250,22 +253,17 @@ def test_consuming_unverified_physical_value_raises_without_flag(valid_v2_verifi
         consume_dam_parameters(dam, allow_unverified=False)
 
 
-def test_consuming_unverified_physical_value_passes_with_flag_and_stamps_output(
+def test_todo_verify_always_raises_even_with_allow_unverified_true(
     valid_v2_verified_config_dict,
 ):
-    """Test that consuming an unverified parameter with allow_unverified=True succeeds and stamps data_status=unverified."""
+    """Test that a parameter with TODO_VERIFY always raises ValueError, even with allow_unverified=True."""
     valid_v2_verified_config_dict["dams"][0]["dam_height_m"] = "TODO_VERIFY"
     with pytest.warns(UnverifiedValueWarning):
         config = load_site_config(valid_v2_verified_config_dict)
 
     dam = config.dams[0]
-    output = consume_dam_parameters(
-        dam,
-        allow_unverified=True,
-        fallbacks={"dam_height_m": 28.0},
-    )
-    assert output["dam_height_m"] == 28.0
-    assert output["data_status"] == "unverified"
+    with pytest.raises(ValueError, match="TODO_VERIFY"):
+        consume_dam_parameters(dam, allow_unverified=True)
 
 
 def test_per_value_verified_false_takes_unverified_guard_path(valid_v2_verified_config_dict):
@@ -283,10 +281,11 @@ def test_per_value_verified_false_takes_unverified_guard_path(valid_v2_verified_
     with pytest.raises(ValueError, match="allow_unverified=True"):
         consume_dam_parameters(dam, allow_unverified=False)
 
-    # With allow_unverified=True, it passes and stamps output with data_status=unverified
+    # With allow_unverified=True, it passes and stamps output with data_status=unverified plus sources
     output = consume_dam_parameters(dam, allow_unverified=True)
     assert output["dam_height_m"] == 28.0
     assert output["data_status"] == "unverified"
+    assert "Unverified rumor" in output["sources"]
 
 
 def test_config_dam_requires_explicit_dam_id_when_a2_has_no_breach_dam(
@@ -319,9 +318,9 @@ def test_site_a_data_status_dam_parameters_is_unverified():
     assert config.data_status.dam_parameters == "unverified"
 
 
-def test_real_site_a_guard_wiring_raises_without_flag_and_returns_unverified_with_flag():
-    """Test on real configs/sites/site_a.yaml: without allow_unverified get_dam_breach_inputs raises;
-    with allow_unverified=True and fallbacks it returns inputs plus data_status='unverified'.
+def test_real_site_a_all_todo_verify_raises_for_both_allow_unverified_flags():
+    """Test on real configs/sites/site_a.yaml: with all-TODO_VERIFY values,
+    get_dam_breach_inputs must raise ValueError for BOTH allow_unverified=False and allow_unverified=True.
     """
     from damsight.breach import get_dam_breach_inputs
 
@@ -331,19 +330,80 @@ def test_real_site_a_guard_wiring_raises_without_flag_and_returns_unverified_wit
 
     dam2 = config.get_dam("machhu_2")
 
-    # Without allow_unverified, it MUST raise ValueError
-    with pytest.raises(ValueError, match="allow_unverified=True"):
+    # With allow_unverified=False, it MUST raise ValueError
+    with pytest.raises(ValueError, match="TODO_VERIFY"):
         get_dam_breach_inputs(dam2, allow_unverified=False)
 
-    # With allow_unverified=True and synthetic fallbacks, it succeeds and stamps data_status="unverified"
-    fallbacks = {
-        "dam_height_m": 24.0,
-        "reservoir_volume_m3": 1.1e8,
-        "crest_elevation_m": 60.5,
+    # With allow_unverified=True, it STILL MUST raise ValueError because values are TODO_VERIFY
+    with pytest.raises(ValueError, match="TODO_VERIFY"):
+        get_dam_breach_inputs(dam2, allow_unverified=True)
+
+
+def test_unverified_numeric_value_with_source_passes_with_flag_and_returns_source_list():
+    """Test on a temporary config with cited numeric values marked verified: false:
+    raises without allow_unverified=True, and succeeds with the flag returning data_status='unverified'
+    plus the sources list.
+    """
+    from damsight.breach import get_dam_breach_inputs
+
+    cfg_dict = {
+        "site_id": "site_test_unverified",
+        "name": "Test Unverified Site",
+        "type": "dam",
+        "data_status": {"dam_parameters": "unverified"},
+        "crs": "EPSG:32643",
+        "aoi": {"bbox": [70.0, 22.0, 71.0, 23.0]},
+        "dams": [
+            {
+                "id": "test_dam_unverified",
+                "role": "single",
+                "location": [70.5, 22.5],
+                "crest_elevation_m": {
+                    "value": 60.5,
+                    "source": "Govt Gazette 1978",
+                    "verified": False,
+                },
+                "dam_height_m": {
+                    "value": 24.0,
+                    "source": "Govt Gazette 1978",
+                    "verified": False,
+                },
+                "reservoir_volume_m3": {
+                    "value": 110000000.0,
+                    "source": "Govt Gazette 1978",
+                    "verified": False,
+                },
+                "source": "State Irrigation Dept",
+            }
+        ],
+        "inputs": {
+            "dem": {"source": "copernicus_30m"},
+            "landcover": "esa_worldcover",
+            "population": "worldpop",
+            "buildings": "osm",
+            "roads": "osm",
+        },
+        "solver": {"mesh_resolution_m": 30.0},
+        "ensemble": {
+            "n_members": 10,
+            "parameters": {"reservoir_level_m": {"range": [50.0, 60.0]}},
+        },
+        "evacuation": {},
     }
-    inputs = get_dam_breach_inputs(dam2, allow_unverified=True, fallbacks=fallbacks)
-    assert inputs["dam_id"] == "machhu_2"
+    with pytest.warns(UnverifiedValueWarning):
+        config = load_site_config(cfg_dict)
+
+    dam = config.dams[0]
+
+    # Without allow_unverified, it MUST raise ValueError
+    with pytest.raises(ValueError, match="allow_unverified=True"):
+        get_dam_breach_inputs(dam, allow_unverified=False)
+
+    # With allow_unverified=True, it succeeds and returns data_status='unverified' + source list
+    inputs = get_dam_breach_inputs(dam, allow_unverified=True)
+    assert inputs["dam_id"] == "test_dam_unverified"
     assert inputs["dam_height_m"] == 24.0
-    assert inputs["reservoir_volume_m3"] == 1.1e8
+    assert inputs["reservoir_volume_m3"] == 110000000.0
     assert inputs["crest_elevation_m"] == 60.5
     assert inputs["data_status"] == "unverified"
+    assert "Govt Gazette 1978" in inputs["sources"] or "State Irrigation Dept" in inputs["sources"]

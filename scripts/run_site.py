@@ -74,21 +74,15 @@ def main():
                 target_dam = d
                 break
 
-        fallbacks = {
-            "dam_height_m": 24.0,
-            "reservoir_volume_m3": 1.1e8,
-            "crest_elevation_m": 60.5,
-        }
         try:
             dam_inputs = get_dam_breach_inputs(
                 target_dam,
                 allow_unverified=args.allow_synthetic,
-                fallbacks=fallbacks,
+                site=config,
             )
         except ValueError as e:
             logger.error(
-                f"Cannot generate breach hydrograph for '{args.site}': {e}. "
-                "Pass --allow-synthetic to run with documented synthetic fallback."
+                f"Cannot generate breach hydrograph for '{args.site}': {e}."
             )
             return 1
 

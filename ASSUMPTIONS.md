@@ -85,3 +85,15 @@ Manning's $n$ values are mapped from ESA WorldCover 10m classes using `data/mann
   - `PendingDeprecationWarning: Use \`@\` matmul instead of \`*\` mul operator for matrix multiplication` emitted from `affine` / `rasterio.transform` (`from_origin` uses `Affine.translation(...) * Affine.scale(...)`).
   - This is an **upstream** library deprecation inside `rasterio`'s internal implementation of `rasterio.transform.from_origin` calling `affine.Affine.__mul__`.
   - Filtered specifically by module and warning message in `pyproject.toml`.
+
+---
+
+## 6. Breach Hydrograph Parametric Dynamics & Cusp at $t_f$
+
+- **Slope Discontinuity (Cusp) at $t = t_f$:**
+  - In the Froehlich parametric breach growth model, breach geometric expansion ($W_b(t)$ widening and $z_b(t)$ invert incision) is assumed linear over the formation duration $t \in [0, t_f]$.
+  - At $t = t_f$, geometric enlargement abruptly ceases as the breach reaches its ultimate terminal dimensions ($B_{\text{final}}$, $z_{b,\text{min}}$).
+  - Because geometric expansion halts while reservoir drawdown continues through pure broad-crested weir drainage, the discharge derivative $\frac{dQ}{dt}$ undergoes an instantaneous transition from positive/near-zero to steep negative decay. This manifests physically and mathematically as a visible cusp or slope discontinuity at $t = t_f$.
+- **Interpretation of Peak Time ($t_{\text{peak}}$):**
+  - The simulated peak outflow time ($t_{\text{peak}}$) is an emergent mathematical result of the competition between expanding breach cross-section and declining reservoir water head ($\frac{dh}{dt}$).
+  - **Operational Warning:** The peak time $t_{\text{peak}}$ must **never** be interpreted or communicated as an operational forecast or prediction of real-world breach culmination. In actual dam incidents, geotechnical piping collapse or structural mass wasting occurs dynamically and irregularly. Parametric peak timing is strictly a benchmark and comparative scenario metric.
