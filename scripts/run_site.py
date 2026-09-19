@@ -5,6 +5,11 @@ import logging
 import sys
 from pathlib import Path
 
+from damsight.breach import (
+    StageStorageCurve,
+    estimate_breach_parameters,
+    generate_breach_hydrograph,
+)
 from damsight.config import load_site_config
 from damsight.data.ingest import MissingDatasetError, run_ingestion
 
@@ -52,7 +57,68 @@ def main():
             logger.info("To run with synthetic sample data for offline demo/testing, pass --allow-synthetic.")
             return 1
 
-    if args.stage in ("breach", "run", "ensemble", "surrogate", "evac"):
+    if args.stage in ("breach", "all"):
+        logger.info(f"Running breach hydrograph generation for {args.site}...")
+        site_cache = project_root / "cache" / args.site
+        site_cache.mkdir(parents=True, exist_ok=True)
+
+        # Check if dam dimensions are verified or need synthetic baseline
+        hb = config.dam.dam_height_m
+        vw = config.dam.reservoir_volume_m3
+        crest_z = config.dam.crest_elevation_m
+
+        if any(isinstance(v, str) and "TODO" in v.upper() for v in (hb, vw, crest_z)):
+            if not args.allow_synthetic:
+                logger.error(
+                    f"Dam dimensions for site '{args.site}' are unverified ('TODO_VERIFY'). "
+                    "Cannot fabricate physical hydrograph without data. Pass --allow-synthetic for illustrative demo."
+                )
+                return 1
+            logger.warning("Dam parameters contain 'TODO_VERIFY'. Using documented synthetic fallback for demonstration.")
+            hb_val = 24.0
+            vw_val = 1.1e8  # ~110 MCM
+            crest_val = 60.5
+        else:
+            hb_val = float(hb)
+            vw_val = float(vw)
+            crest_val = float(crest_z)
+
+        is_natural = (config.type == "natural_blockage")
+        breach_params = estimate_breach_parameters(
+            reservoir_volume_m3=vw_val,
+            breach_height_m=hb_val,
+            water_depth_m=hb_val,
+            mode=config.dam.breach_types[0] if config.dam.breach_types else "overtopping",
+            is_natural_dam=is_natural,
+        )
+
+        stage_storage = None
+        if config.dam.stage_storage_csv:
+            csv_p = project_root / config.dam.stage_storage_csv
+            if csv_p.exists():
+                stage_storage = StageStorageCurve(
+                    invert_elevation_m=crest_val - hb_val,
+                    crest_elevation_m=crest_val,
+                    max_volume_m3=vw_val,
+                    csv_path=csv_p,
+                )
+
+        hydro_res = generate_breach_hydrograph(
+            params=breach_params,
+            stage_storage=stage_storage,
+            crest_elevation_m=crest_val,
+            dt_s=5.0,
+        )
+
+        out_csv = site_cache / "hydrograph.csv"
+        out_meta = site_cache / "hydrograph_meta.json"
+        hydro_res.save_csv(out_csv)
+        hydro_res.save_metadata(out_meta)
+
+        logger.info("Breach hydrograph generation completed!")
+        logger.info(f"Breach Parameters Summary:\n  Average Width: {breach_params.breach_width_avg_m:.2f} m\n  Formation Time: {breach_params.formation_time_s:.1f} s ({breach_params.formation_time_hr:.2f} hr)\n  Froehlich (1995) Empirical Qp: {breach_params.empirical_peak_qp_m3s:.1f} m3/s\n  Hydrograph Peak Outflow: {hydro_res.peak_discharge_hydrograph_m3s:.1f} m3/s\n  Ratio (Hydrograph / Qp): {hydro_res.peak_discharge_hydrograph_m3s / breach_params.empirical_peak_qp_m3s:.3f}\n  Mass Balance Conserved: {hydro_res.mass_conserved} (Error: {hydro_res.mass_balance_error_pct:.4f}%)\n  Monotonic Drawdown: {hydro_res.drawdown_monotonic}")
+
+    if args.stage in ("run", "ensemble", "surrogate", "evac"):
         logger.info(f"Stage '{args.stage}' not implemented yet.")
 
     return 0

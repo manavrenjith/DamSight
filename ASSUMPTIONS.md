@@ -8,12 +8,13 @@ This document tracks all physical constants, empirical coefficients, parameter r
 
 ## 1. Physical & Empirical Formulations
 
-| Item | Formula / Value | Source / Citation | Verification Status | Notes |
+| Item | Formula (SI Units) | Full Citation & Source | Verification Status | Unit Conversions & Notes |
 |---|---|---|---|---|
-| Froehlich (2008) Breach Width | $B_{\text{avg}} = 0.27 K_o V_w^{0.32} h_b^{0.04}$ | Froehlich, D. C. (2008). *Embankment dam breach parameters and their uncertainties*. J. Hydraul. Eng. | Sourced from paper | $K_o = 1.3$ (overtopping), $1.0$ (piping). SI units. |
-| Froehlich (2008) Formation Time | $t_f = 63.2 \sqrt{\frac{V_w}{g h_b^2}}$ | Froehlich, D. C. (2008). | Sourced from paper | SI units ($t_f$ in seconds). |
-| Froehlich (1995) Peak Outflow | $Q_p = 0.607 V_w^{0.295} h_w^{1.24}$ | Froehlich, D. C. (1995). *Peak outflow from breached embankment dam*. | Sourced from paper | SI units. Used as sanity upper bound on hydrograph peak. |
-| Broad-Crested Weir Coefficient | $C_d \approx 1.7 \text{ m}^{1/2}/\text{s}$ | Standard open-channel hydraulics | General hydraulic assumption | Used for trapezoidal breach weir flow calculation. |
+| Froehlich (2008) Breach Width | $B_{\text{avg}} = 0.27 K_o V_w^{0.32} h_b^{0.04}$ | Froehlich, D. C. (2008). *Embankment dam breach parameters and their uncertainties*. Journal of Hydraulic Engineering, 134(12), 1708-1721. | Verified against published paper | SI units: $V_w$ in $\text{m}^3$, $h_b$ in $\text{m}$, $B_{\text{avg}}$ in $\text{m}$. (English units equivalent uses $0.1803$ with acre-ft and ft). $K_o = 1.3$ (overtopping), $1.0$ (piping). |
+| Froehlich (2008) Formation Time | $t_f = 63.2 \sqrt{\frac{V_w}{g h_b^2}}$ | Froehlich, D. C. (2008). *Embankment dam breach parameters and their uncertainties*. J. Hydraul. Eng. | Verified against published paper | SI units: $g = 9.80665 \text{ m/s}^2$, $t_f$ in seconds. $t_f(\text{hr}) = t_f / 3600$. (English units equivalent uses $g = 32.174\text{ ft/s}^2$, factor $0.0176$ hr). |
+| Froehlich (1995) Peak Outflow | $Q_p = 0.607 V_w^{0.295} h_w^{1.24}$ | Froehlich, D. C. (1995). *Peak outflow from breached embankment dam*. Journal of Water Resources Planning and Management, 121(1), 90-97. | Verified against published paper | SI units: $V_w$ in $\text{m}^3$, $h_w$ in $\text{m}$, $Q_p$ in $\text{m}^3/\text{s}$. (English units equivalent uses $23.4$ with $V_w$ in acre-ft, $h_w$ in ft). |
+| Broad-Crested Trapezoidal Weir | $Q = C_{d1} W_b h^{1.5} + C_{d2} Z h^{2.5}$ | Standard Open-Channel Hydraulics (Henderson, 1966; Chow, 1959) | Standard hydraulic formulation | $C_{d1} = 1.70 \text{ m}^{1/2}/\text{s}$ (rectangular weir), $C_{d2} = 1.35 \text{ m}^{1/2}/\text{s}$ (triangular side weir, $Z$ horizontal to 1 vertical). |
+| Natural Dam Breach Parameters | $t_f \times 0.40$, $B_{\text{avg}} \times 1.25$ | Costa & Schuster (1988); Peng & Zhang (2012) | **ILLUSTRATIVE ONLY** | Landslide and moraine dams feature unconsolidated, non-compacted material leading to accelerated incision. Tagged `parameter_status: illustrative` in metadata and UI. |
 
 ---
 
