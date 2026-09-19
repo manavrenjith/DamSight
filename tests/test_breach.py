@@ -1,4 +1,4 @@
-"""Unit tests for Froehlich breach parameter equations and hydrograph generation."""
+"""Comprehensive unit tests for Froehlich breach parameter equations and hydrograph generation."""
 
 import json
 from pathlib import Path
@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from damsight.breach.froehlich import (
+    BreachParameters,
     estimate_breach_parameters,
     froehlich_breach_width,
     froehlich_formation_time,
@@ -18,10 +19,10 @@ from damsight.breach.hydrograph import (
 
 
 def test_froehlich_worked_examples():
-    """(a) Hand-computed worked examples for Froehlich formulas with step-by-step arithmetic.
+    """(a) Hand-computed worked examples for Froehlich formulas with step-by-step independent arithmetic.
 
     =============================================================================
-    WORKED EXAMPLE INPUTS (Standard Embankment Failure):
+    WORKED EXAMPLE 1 (Equal Height and Depth: hb = hw = 20.0 m):
       Reservoir Volume (V_w) = 1.0e7 m^3 (10,000,000 m^3 = 10 MCM)
       Breach Height (h_b)    = 20.0 m
       Water Depth (h_w)      = 20.0 m
@@ -34,17 +35,17 @@ def test_froehlich_worked_examples():
        Step 1: Compute V_w ^ 0.32
          V_w ^ 0.32 = (10,000,000) ^ 0.32 = 173.7800828749377
 
-       Step 2: Compute h_b ^ 0.04
-         h_b ^ 0.04 = (20.0) ^ 0.04 = 1.1274615024471927
+       Step 2: Compute h_b ^ 0.04  (20 ^ 0.04 = 1.127304, rounded to 1.12730)
+         h_b ^ 0.04 = (20.0) ^ 0.04 = 1.127304394081711
 
        Step 3a: Overtopping Mode (K_o = 1.3)
-         B_avg = 0.27 * 1.3 * 173.7800828749377 * 1.1274615024471927
-               = 0.351 * 173.7800828749377 * 1.1274615024471927
+         B_avg = 0.27 * 1.3 * 173.7800828749377 * 1.127304394081711
+               = 0.351 * 173.7800828749377 * 1.127304394081711
                = 68.76203 m
 
        Step 3b: Piping Mode (K_o = 1.0)
-         B_avg = 0.27 * 1.0 * 173.7800828749377 * 1.1274615024471927
-               = 0.270 * 173.7800828749377 * 1.1274615024471927
+         B_avg = 0.27 * 1.0 * 173.7800828749377 * 1.127304394081711
+               = 0.270 * 173.7800828749377 * 1.127304394081711
                = 52.89387 m
 
     -----------------------------------------------------------------------------
@@ -82,24 +83,82 @@ def test_froehlich_worked_examples():
     h_b = 20.0
     h_w = 20.0
 
-    # 1. Test Breach Width
     b_overtopping = froehlich_breach_width(v_w, h_b, mode="overtopping")
-    assert abs(b_overtopping - 68.7620) < 1e-3, f"Expected ~68.7620 m, got {b_overtopping}"
+    assert abs(b_overtopping - 68.7620) < 1e-3
 
     b_piping = froehlich_breach_width(v_w, h_b, mode="piping")
-    assert abs(b_piping - 52.8938) < 1e-3, f"Expected ~52.8938 m, got {b_piping}"
+    assert abs(b_piping - 52.8938) < 1e-3
 
-    # 2. Test Formation Time
     t_f = froehlich_formation_time(v_w, h_b)
-    assert abs(t_f - 3191.00) < 1e-2, f"Expected ~3191.00 s, got {t_f}"
+    assert abs(t_f - 3191.00) < 1e-2
 
-    # 3. Test Peak Outflow
     q_p = froehlich_peak_outflow(v_w, h_w)
-    assert abs(q_p - 2893.78) < 1e-2, f"Expected ~2893.78 m^3/s, got {q_p}"
+    assert abs(q_p - 2893.78) < 1e-2
 
 
-def test_outflow_volume_less_than_or_equal_to_stored_volume():
-    """(b) Test that total integrated hydrograph outflow volume <= initial stored volume."""
+def test_froehlich_worked_example_unequal_hb_hw():
+    """(a) Hand-computed worked example with hb != hw (e.g. Vw=2.5e7 m^3, hb=30.0 m, hw=27.5 m).
+
+    =============================================================================
+    WORKED EXAMPLE 2 (Independent Calculator Verification with hb != hw):
+      Reservoir Volume (V_w) = 2.5e7 m^3 (25,000,000 m^3 = 25 MCM)
+      Breach Height (h_b)    = 30.0 m
+      Water Depth (h_w)      = 27.5 m  (Reservoir partially drawn down below crest)
+      Gravity (g)            = 9.80665 m/s^2
+
+    Step 1: Breach Width (Overtopping, K_o = 1.3)
+      V_w ^ 0.32 = 25,000,000 ^ 0.32 = 232.99188916435534
+      h_b ^ 0.04 = 30.0 ^ 0.04       = 1.1457367676485573
+      B_avg = 0.27 * 1.3 * 232.991889 * 1.145737 = 93.6985 m
+
+    Step 2: Breach Width (Piping, K_o = 1.0)
+      B_avg = 0.27 * 1.0 * 232.991889 * 1.145737 = 72.0758 m
+
+    Step 3: Formation Time (t_f)
+      g * h_b ^ 2 = 9.80665 * 900.0 = 8825.985 m^3/s^2
+      Ratio = 25,000,000 / 8825.985 = 2832.545 s^2
+      sqrt(Ratio) = 53.22166 s
+      t_f = 63.2 * 53.22166 = 3363.6089 s (~56.06 min)
+
+    Step 4: Peak Outflow Q_p (depends on hw = 27.5 m, NOT hb = 30.0 m)
+      V_w ^ 0.295 = 25,000,000 ^ 0.295 = 152.1921676102556
+      h_w ^ 1.24  = 27.5 ^ 1.24        = 60.92177388018944
+      Q_p = 0.607 * 152.192168 * 60.921774 = 5627.9928 m^3/s
+
+    Step 5: Argument Swap Sensitivity Audit (AGENTS.md Rule 1)
+      If hb and hw were mistakenly swapped, Q_p would use h_b=30.0 m:
+      h_b ^ 1.24 = 30.0 ^ 1.24 = 67.862578
+      Q_p_swapped = 0.607 * 152.192168 * 67.862578 = 6269.1888 m^3/s
+      Delta = |6269.19 - 5627.99| = 641.20 m^3/s (~11.4% error)
+    =============================================================================
+    """
+    v_w = 2.5e7
+    h_b = 30.0
+    h_w = 27.5
+
+    # 1. Breach Width
+    b_ov = froehlich_breach_width(v_w, h_b, mode="overtopping")
+    assert abs(b_ov - 93.6985) < 1e-3, f"Expected 93.6985 m, got {b_ov}"
+
+    b_pip = froehlich_breach_width(v_w, h_b, mode="piping")
+    assert abs(b_pip - 72.0758) < 1e-3, f"Expected 72.0758 m, got {b_pip}"
+
+    # 2. Formation Time
+    t_f = froehlich_formation_time(v_w, h_b)
+    assert abs(t_f - 3363.61) < 1e-2, f"Expected 3363.61 s, got {t_f}"
+
+    # 3. Peak Outflow with hw
+    q_p = froehlich_peak_outflow(v_w, h_w)
+    assert abs(q_p - 5627.99) < 1e-2, f"Expected 5627.99 m^3/s, got {q_p}"
+
+    # 4. Swap sensitivity test: verify that passing swapped argument produces different result
+    q_p_swapped = froehlich_peak_outflow(v_w, h_b)
+    assert abs(q_p_swapped - 6269.19) < 1e-2
+    assert abs(q_p - q_p_swapped) > 600.0
+
+
+def test_mass_conservation_and_clamp_binding():
+    """(b)(i) Mass conservation: total outflow <= stored, clamp never binds before recession tail."""
     v_init = 8.5e6  # 8.5 MCM
     h_b = 25.0
 
@@ -122,11 +181,88 @@ def test_outflow_volume_less_than_or_equal_to_stored_volume():
         dt_s=5.0,
     )
 
-    # Mass conservation assertions
+    # Outflow volume <= stored volume
     assert res.mass_conserved is True
     assert res.total_outflow_volume_m3 <= v_init + 1e-3
     assert res.mass_balance_error_pct < 0.05
-    assert res.total_outflow_volume_m3 > 0.90 * v_init  # Vast majority drained
+    assert res.total_outflow_volume_m3 > 0.90 * v_init
+
+    # (i) Assert that the min() clamp NEVER bound before the recession tail
+    assert res.clamp_active_before_recession == 0, (
+        f"Clamp bound {res.clamp_active_before_recession} times before the recession tail!"
+    )
+
+
+def test_dead_storage_never_drained():
+    """(b)(ii) Test with dead storage below breach invert showing drawdown never removes it."""
+    v_active = 6.0e6  # 6.0 MCM above breach invert
+    v_dead = 2.0e6    # 2.0 MCM dead storage below invert
+    v_total = v_active + v_dead
+    h_b = 20.0
+    invert_z = 50.0
+    crest_z = 70.0
+    bed_z = 35.0  # reservoir bottom 15m below breach invert
+
+    params = estimate_breach_parameters(
+        reservoir_volume_m3=v_active,
+        breach_height_m=h_b,
+        water_depth_m=h_b,
+        mode="overtopping",
+    )
+
+    stage_storage = StageStorageCurve(
+        invert_elevation_m=invert_z,
+        crest_elevation_m=crest_z,
+        max_volume_m3=v_total,
+        dead_storage_m3=v_dead,
+        bed_elevation_m=bed_z,
+    )
+
+    res = generate_breach_hydrograph(
+        params=params,
+        stage_storage=stage_storage,
+        crest_elevation_m=crest_z,
+        dt_s=5.0,
+    )
+
+    # 1. Total outflow must not exceed active storage
+    assert res.total_outflow_volume_m3 <= v_active + 1e-3
+
+    # 2. Dead storage must remain completely untouched in the reservoir
+    assert res.remaining_reservoir_volume_m3 >= v_dead - 1e-3
+    assert abs(res.remaining_reservoir_volume_m3 - v_dead) < 10.0  # within 10 m^3
+
+    # 3. Water stage never draws down below breach invert elevation
+    final_stage = res.stage_m[-1]
+    assert final_stage >= invert_z - 1e-3
+
+
+def test_dt_convergence():
+    """(b)(iii) Test dt convergence: peak and total volume change < 2% between dt and dt/2."""
+    v_init = 1.0e7
+    h_b = 22.0
+
+    params = estimate_breach_parameters(
+        reservoir_volume_m3=v_init,
+        breach_height_m=h_b,
+        water_depth_m=h_b,
+        mode="overtopping",
+    )
+
+    # Run with dt = 10.0 s
+    res_dt1 = generate_breach_hydrograph(params=params, dt_s=10.0)
+
+    # Run with dt/2 = 5.0 s
+    res_dt2 = generate_breach_hydrograph(params=params, dt_s=5.0)
+
+    # Relative difference in peak discharge
+    peak_diff_pct = abs(res_dt1.peak_discharge_hydrograph_m3s - res_dt2.peak_discharge_hydrograph_m3s) / res_dt2.peak_discharge_hydrograph_m3s * 100.0
+
+    # Relative difference in total volume
+    vol_diff_pct = abs(res_dt1.total_outflow_volume_m3 - res_dt2.total_outflow_volume_m3) / res_dt2.total_outflow_volume_m3 * 100.0
+
+    assert peak_diff_pct < 2.0, f"Peak discharge dt convergence error {peak_diff_pct:.3f}% >= 2.0%"
+    assert vol_diff_pct < 2.0, f"Total volume dt convergence error {vol_diff_pct:.3f}% >= 2.0%"
 
 
 def test_monotonic_reservoir_drawdown():
@@ -143,45 +279,65 @@ def test_monotonic_reservoir_drawdown():
     res = generate_breach_hydrograph(params=params, dt_s=10.0)
 
     assert res.drawdown_monotonic is True
-
-    # Confirm delta stage between consecutive steps is non-positive
     stage_diffs = np.diff(res.stage_m)
     assert np.all(stage_diffs <= 1e-7), f"Max stage increase detected: {np.max(stage_diffs)}"
 
 
 def test_hydrograph_peak_vs_empirical_qp_side_by_side(capsys):
-    """(d) Test and report peak from the hydrograph vs empirical Qp side by side."""
+    """(d) Assert 0.5 <= Q_peak/Qp <= 2.0 and print the inputs used side by side."""
     v_init = 1.2e7  # 12 MCM
     h_b = 30.0
+    h_w = 30.0
+    mode = "overtopping"
+    dam_type = "embankment"
+    dt_s = 5.0
+    cd_rect = 1.70
+    cd_tri = 1.35
 
     params = estimate_breach_parameters(
         reservoir_volume_m3=v_init,
         breach_height_m=h_b,
-        water_depth_m=h_b,
-        mode="overtopping",
+        water_depth_m=h_w,
+        mode=mode,
+        dam_type=dam_type,
     )
 
-    res = generate_breach_hydrograph(params=params, dt_s=5.0)
+    res = generate_breach_hydrograph(
+        params=params,
+        dt_s=dt_s,
+        cd_rect=cd_rect,
+        cd_tri=cd_tri,
+    )
 
     q_peak_hydrograph = res.peak_discharge_hydrograph_m3s
     q_peak_empirical = res.empirical_peak_qp_m3s
-
     ratio = q_peak_hydrograph / q_peak_empirical
 
-    # Both values must be positive and within physical hydraulic ratio (0.5 to 1.8)
-    assert q_peak_hydrograph > 0.0
-    assert q_peak_empirical > 0.0
-    assert 0.5 <= ratio <= 1.8
-
-    # Print side-by-side comparison for report visibility
-    print(f"\n[BREACH PEAK DISCHARGE COMPARISON]")
-    print(f"  Hydrograph Peak Flow (Q_peak):    {q_peak_hydrograph:10.2f} m^3/s")
-    print(f"  Froehlich (1995) Empirical (Q_p): {q_peak_empirical:10.2f} m^3/s")
+    # Print inputs and results side by side
+    print("\n=======================================================")
+    print("BREACH PEAK DISCHARGE COMPARISON & INPUT AUDIT (TEST D)")
+    print("=======================================================")
+    print("Inputs Used:")
+    print(f"  Reservoir Active Volume (V_w):   {v_init:.1e} m³ ({v_init/1e6:.1f} MCM)")
+    print(f"  Breach Height (h_b):             {h_b:.1f} m")
+    print(f"  Water Depth (h_w):               {h_w:.1f} m")
+    print(f"  Breach Mode:                     {mode}")
+    print(f"  Dam Type:                        {dam_type}")
+    print(f"  Time Step (dt):                  {dt_s:.1f} s")
+    print(f"  Weir Coefficients:               Cd_rect={cd_rect}, Cd_tri={cd_tri}")
+    print("-------------------------------------------------------")
+    print("Discharge Comparison:")
+    print(f"  Hydrograph Peak Outflow (Q_peak): {q_peak_hydrograph:10.2f} m³/s")
+    print(f"  Froehlich (1995) Empirical (Q_p): {q_peak_empirical:10.2f} m³/s")
     print(f"  Ratio (Q_peak / Q_p):             {ratio:10.3f}")
+    print("=======================================================\n")
+
+    # Assert bounded ratio per specification
+    assert 0.5 <= ratio <= 2.0, f"Ratio {ratio:.3f} outside [0.5, 2.0]"
 
 
 def test_natural_dam_illustrative_handling():
-    """Verify natural dam variant uses accelerated formation and is marked illustrative."""
+    """Verify natural dam variant uses factors 0.40 and 1.25 and carries parameter_status=illustrative."""
     v_init = 4.0e6
     h_b = 15.0
 
@@ -190,11 +346,35 @@ def test_natural_dam_illustrative_handling():
 
     assert nat_params.is_natural_dam is True
     assert nat_params.parameter_status == "illustrative"
-    assert "illustrative" in nat_params.notes.lower()
-    # Formation time in unconsolidated debris must be faster than engineered embankment
-    assert nat_params.formation_time_s < std_params.formation_time_s
-    # Breach width in unconsolidated debris is wider
-    assert nat_params.breach_width_avg_m > std_params.breach_width_avg_m
+    assert "invented placeholder, no source" in nat_params.notes.lower()
+
+    # Exact factor checks
+    assert abs(nat_params.formation_time_s - 0.40 * std_params.formation_time_s) < 0.05
+    assert abs(nat_params.breach_width_avg_m - 1.25 * std_params.breach_width_avg_m) < 0.05
+
+    # Check hydrograph metadata reflects illustrative status
+    res = generate_breach_hydrograph(params=nat_params)
+    assert res.is_natural_dam is True
+
+
+def test_non_embankment_dam_type_raises_error():
+    """Test that non-embankment dam types (e.g. arch, concrete gravity) raise ValueError."""
+    v_init = 1.0e7
+    h_b = 25.0
+
+    # Arch dam (like Idukki)
+    with pytest.raises(ValueError, match="only for embankment dams"):
+        estimate_breach_parameters(v_init, h_b, dam_type="arch")
+
+    # Masonry gravity dam (like Mullaperiyar)
+    with pytest.raises(ValueError, match="only for embankment dams"):
+        froehlich_breach_width(v_init, h_b, dam_type="masonry_gravity")
+
+    with pytest.raises(ValueError, match="only for embankment dams"):
+        froehlich_formation_time(v_init, h_b, dam_type="concrete_gravity")
+
+    with pytest.raises(ValueError, match="only for embankment dams"):
+        froehlich_peak_outflow(v_init, h_b, dam_type="buttress")
 
 
 def test_hydrograph_file_exports(tmp_path):
@@ -221,3 +401,5 @@ def test_hydrograph_file_exports(tmp_path):
     assert "empirical_froehlich_qp_m3s" in meta
     assert meta["mass_conserved"] is True
     assert meta["drawdown_monotonic"] is True
+    assert meta["parameter_status"] == "verified_formula"
+    assert "clamp_active_before_recession" in meta
