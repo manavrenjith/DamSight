@@ -76,3 +76,12 @@ Manning's $n$ values are mapped from ESA WorldCover 10m classes using `data/mann
 - **Safety Clearance Margin:** 10 minutes prior to flood wave arrival at any road link.
 - **Safe Zone Definition:** Elevation $\ge$ P90 flood elevation $+ 1.0$m buffer, or areas with zero inundation probability.
 - **Road Graph:** Derived from OpenStreetMap highway tags (`motorway`, `trunk`, `primary`, `secondary`, `tertiary`, `unclassified`, `residential`). Unmapped tracks or collapsed bridges are treated as impassable unless mapped.
+
+---
+
+## 5. Upstream Dependencies & Deprecations
+
+- **Affine / Rasterio Transform Operator Deprecation:**
+  - `PendingDeprecationWarning: Use \`@\` matmul instead of \`*\` mul operator for matrix multiplication` emitted from `affine` / `rasterio.transform` (`from_origin` uses `Affine.translation(...) * Affine.scale(...)`).
+  - This is an **upstream** library deprecation inside `rasterio`'s internal implementation of `rasterio.transform.from_origin` calling `affine.Affine.__mul__`.
+  - Filtered specifically by module and warning message in `pyproject.toml`.
