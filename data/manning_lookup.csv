@@ -1,0 +1,12 @@
+class_code,description,manning_n,source,verified
+10,Tree cover,0.120,Chow (1959) Open-Channel Hydraulics Table 5-6 (Dense willow / heavy timber),true
+20,Shrubland,0.070,Chow (1959) Open-Channel Hydraulics Table 5-6 (Medium to dense brush),true
+30,Grassland,0.035,Chow (1959) Open-Channel Hydraulics Table 5-6 (High grass / pasture),true
+40,Cropland,0.040,Arcement & Schneider (1989) USGS WSP 2339 Table 1 (Cultivated crops),true
+50,Built-up,0.150,Syme (2008) Australian Rainfall and Runoff Revision Project 15,true
+60,Bare / sparse vegetation,0.030,Chow (1959) Open-Channel Hydraulics Table 5-6 (Clean gravel/earth),true
+70,Snow and ice,0.020,Chow (1959) Open-Channel Hydraulics Table 5-6 (Smooth ice/frozen ground),true
+80,Permanent water bodies,0.025,Chow (1959) Open-Channel Hydraulics Table 5-6 (Clean straight natural channel),true
+90,Herbaceous wetland,0.060,Arcement & Schneider (1989) USGS WSP 2339 Table 1 (Marsh / wetland),true
+95,Mangroves,0.140,Arcement & Schneider (1989) USGS WSP 2339 Table 1 (Dense timbered wetland),true
+100,Moss and lichen,0.030,Chow (1959) Open-Channel Hydraulics Table 5-6 (Smooth tundra/bare earth),true

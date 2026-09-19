@@ -25,7 +25,7 @@ lint:
 	python -m ruff check src/ tests/ || echo "Lint check finished"
 
 ingest:
-	@echo "not implemented yet"
+	python scripts/run_site.py --site site_a --stage ingest --allow-synthetic
 
 run-site:
 	@echo "not implemented yet"
