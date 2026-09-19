@@ -1,27 +1,47 @@
 site_id: site_a
-name: "TODO_VERIFY: Machhu-II Dam (Morbi)"
-type: dam
+name: "TODO_VERIFY: Machhu-I / Machhu-II chain"
+type: cascade
 data_status:
   dam_parameters: unverified
-crs: "EPSG:32643"
+crs: "TODO_VERIFY"
 aoi:
   bbox:
     - "TODO_VERIFY"
     - "TODO_VERIFY"
     - "TODO_VERIFY"
     - "TODO_VERIFY"
-dam:
-  location:
-    - "TODO_VERIFY"
-    - "TODO_VERIFY"
-  crest_elevation_m: "TODO_VERIFY"
-  dam_height_m: "TODO_VERIFY"
-  reservoir_volume_m3: "TODO_VERIFY"
-  stage_storage_csv: null
-  breach_types:
-    - overtopping
-    - piping
-  source: "TODO_VERIFY: Pending official India-WRIS / NRLD citation"
+dams:
+  - id: machhu_1
+    role: upstream
+    location:
+      - "TODO_VERIFY"
+      - "TODO_VERIFY"
+    crest_elevation_m: "TODO_VERIFY"
+    dam_height_m: "TODO_VERIFY"
+    reservoir_volume_m3: "TODO_VERIFY"
+    stage_storage_csv: data/site_a/machhu1_stage_storage.csv
+    dam_type: embankment
+    source: "TODO: cite"
+  - id: machhu_2
+    role: downstream
+    location:
+      - "TODO_VERIFY"
+      - "TODO_VERIFY"
+    crest_elevation_m: "TODO_VERIFY"
+    dam_height_m: "TODO_VERIFY"
+    reservoir_volume_m3: "TODO_VERIFY"
+    stage_storage_csv: data/site_a/machhu2_stage_storage.csv
+    dam_type: embankment
+    spillway_capacity_m3s: "TODO_VERIFY"
+    source: "TODO: cite"
+scenarios:
+  - id: A1_hindcast_1979
+    kind: hindcast
+    breach_dam: machhu_2
+    breach_type: overtopping
+  - id: A2_cascade_whatif
+    kind: hypothetical
+    upstream_release_from: machhu_1
 inputs:
   dem:
     source: copernicus_30m
@@ -31,15 +51,17 @@ inputs:
   buildings: osm
   roads: osm
 reference_events:
-  - name: "TODO_VERIFY: Machhu-II 1979 Historical Extent"
-    extent: data/site_a/reference_extent.geojson
-    source: "TODO_VERIFY: Historical study reference"
+  - name: "Machhu-II 1979"
+    type: historical
+    extent: null
+    source: "TODO: user to supply (open item O2)"
 solver:
-  far_field: anuga
+  far_field: delft3dfm
+  baseline: anuga
   near_field: none
   mesh_resolution_m: 30.0
 ensemble:
-  n_members: 200
+  n_members: 100
   parameters:
     breach_width:
       sigma_ln: 0.3

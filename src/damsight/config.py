@@ -1,10 +1,10 @@
-"""Configuration schema and loader for DamSight with TODO_VERIFY tracking."""
+"""Configuration schema and loader for DamSight v2 with TODO_VERIFY tracking."""
 
 from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Any, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -23,25 +23,41 @@ def is_todo_value(val: Any) -> bool:
     return False
 
 
+def extract_value_and_meta(val: Any) -> Tuple[Any, Optional[str], Optional[bool]]:
+    """Unpack value and metadata if structured as a dictionary {value, source, verified}."""
+    if isinstance(val, dict) and "value" in val:
+        return val["value"], val.get("source"), val.get("verified")
+    return val, None, None
+
+
 def validate_maybe_float(val: Any, field_name: str) -> Union[float, str]:
-    """Validate a value that should be a float but may be a TODO_VERIFY marker."""
-    if isinstance(val, (int, float)):
-        return float(val)
-    if isinstance(val, str):
-        if is_todo_value(val):
+    """Validate a value that should be a float but may be a TODO_VERIFY marker or per-value dict."""
+    raw_val, source, verified = extract_value_and_meta(val)
+
+    if verified is False:
+        warnings.warn(
+            f"Config field '{field_name}' marked verified=false (source: '{source}')",
+            UnverifiedValueWarning,
+            stacklevel=3,
+        )
+
+    if isinstance(raw_val, (int, float)):
+        return float(raw_val)
+    if isinstance(raw_val, str):
+        if is_todo_value(raw_val):
             warnings.warn(
-                f"Config field '{field_name}' contains unverified value: '{val}'",
+                f"Config field '{field_name}' contains unverified value: '{raw_val}'",
                 UnverifiedValueWarning,
                 stacklevel=3,
             )
-            return val
+            return raw_val
         try:
-            return float(val)
+            return float(raw_val)
         except ValueError:
             raise ValueError(
-                f"Field '{field_name}' value '{val}' is neither a valid number nor a TODO marker"
+                f"Field '{field_name}' value '{raw_val}' is neither a valid number nor a TODO marker"
             )
-    raise ValueError(f"Field '{field_name}' expected float or TODO string, got {type(val).__name__}")
+    raise ValueError(f"Field '{field_name}' expected float or TODO string, got {type(raw_val).__name__}")
 
 
 def validate_float_list(
@@ -64,7 +80,7 @@ class DataStatusConfig(BaseModel):
     """Honesty flags displayed in the UI."""
 
     model_config = ConfigDict(extra="forbid")
-    dam_parameters: Literal["verified", "unverified", "synthetic"] = "unverified"
+    dam_parameters: Literal["verified", "unverified", "synthetic", "defaulted"] = "unverified"
 
 
 class AoiConfig(BaseModel):
@@ -79,17 +95,22 @@ class AoiConfig(BaseModel):
         return validate_float_list(v, "aoi.bbox", expected_len=4)
 
 
-class DamConfig(BaseModel):
-    """Geotechnical and location attributes for the dam."""
+class DamItemConfig(BaseModel):
+    """Geotechnical and operational attributes for a dam in a cascade or single site."""
 
     model_config = ConfigDict(extra="forbid")
+    id: str
+    role: Optional[str] = "single"  # upstream | downstream | single | midstream
     location: List[Union[float, str]]  # [lon, lat]
     crest_elevation_m: Union[float, str]
     dam_height_m: Union[float, str]
     reservoir_volume_m3: Union[float, str]
     stage_storage_csv: Optional[str] = None
+    dam_type: str = "embankment"
+    spillway_capacity_m3s: Optional[Union[float, str]] = None
     breach_types: List[str] = Field(default_factory=lambda: ["overtopping", "piping"])
     source: Optional[str] = None
+    verified: Optional[bool] = None
 
     @field_validator("location", mode="before")
     @classmethod
@@ -101,6 +122,13 @@ class DamConfig(BaseModel):
     def check_dimension(cls, v: Any, info: Any) -> Union[float, str]:
         return validate_maybe_float(v, f"dam.{info.field_name}")
 
+    @field_validator("spillway_capacity_m3s", mode="before")
+    @classmethod
+    def check_spillway(cls, v: Any) -> Optional[Union[float, str]]:
+        if v is None:
+            return None
+        return validate_maybe_float(v, "dam.spillway_capacity_m3s")
+
     @field_validator("source", mode="after")
     @classmethod
     def check_source(cls, v: Optional[str]) -> Optional[str]:
@@ -111,6 +139,17 @@ class DamConfig(BaseModel):
                 stacklevel=3,
             )
         return v
+
+
+class ScenarioConfig(BaseModel):
+    """Simulation scenario definition."""
+
+    model_config = ConfigDict(extra="allow")
+    id: str
+    kind: str = "hindcast"  # hindcast | hypothetical | release | benchmark
+    breach_dam: Optional[str] = None
+    breach_type: Optional[str] = None
+    upstream_release_from: Optional[str] = None
 
 
 class DemInputConfig(BaseModel):
@@ -137,7 +176,8 @@ class ReferenceEventConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     name: str
-    extent: str
+    type: str = "historical"  # historical | satellite | benchmark
+    extent: Optional[str] = None
     source: Optional[str] = None
 
     @field_validator("name", "source", mode="after")
@@ -153,10 +193,11 @@ class ReferenceEventConfig(BaseModel):
 
 
 class SolverConfig(BaseModel):
-    """Hydrodynamic solver execution parameters."""
+    """Hydrodynamic solver execution parameters (v2)."""
 
     model_config = ConfigDict(extra="forbid")
-    far_field: str = "anuga"
+    far_field: str = "delft3dfm"
+    baseline: str = "anuga"
     near_field: str = "none"
     mesh_resolution_m: float = 30.0
 
@@ -194,7 +235,7 @@ class EnsembleConfig(BaseModel):
     """Monte Carlo ensemble configuration."""
 
     model_config = ConfigDict(extra="forbid")
-    n_members: int = 200
+    n_members: int = 100
     parameters: EnsembleParameters
 
 
@@ -209,17 +250,18 @@ class EvacuationConfig(BaseModel):
 
 
 class SiteConfig(BaseModel):
-    """Master configuration schema for a demo site."""
+    """Master configuration schema for a demo site (v2)."""
 
     model_config = ConfigDict(extra="forbid")
 
     site_id: str
     name: str
-    type: Literal["dam", "natural_blockage", "cascade"] = "dam"
+    type: Literal["dam", "natural_blockage", "cascade"] = "cascade"
     data_status: DataStatusConfig
     crs: str
     aoi: AoiConfig
-    dam: DamConfig
+    dams: List[DamItemConfig]
+    scenarios: List[ScenarioConfig] = Field(default_factory=list)
     inputs: InputsConfig
     reference_events: List[ReferenceEventConfig] = Field(default_factory=list)
     solver: SolverConfig
@@ -236,6 +278,33 @@ class SiteConfig(BaseModel):
                 stacklevel=3,
             )
         return v
+
+    @field_validator("crs", mode="after")
+    @classmethod
+    def check_site_crs(cls, v: str) -> str:
+        if is_todo_value(v):
+            warnings.warn(
+                f"Site CRS is unverified: '{v}'",
+                UnverifiedValueWarning,
+                stacklevel=3,
+            )
+        return v
+
+    @property
+    def dam(self) -> DamItemConfig:
+        """Return primary breach dam for backwards-compatibility."""
+        if not self.dams:
+            raise ValueError("No dams configured for this site")
+        for sc in self.scenarios:
+            if sc.breach_dam:
+                for d in self.dams:
+                    if d.id == sc.breach_dam:
+                        return d
+        # Default to downstream or first dam
+        for d in self.dams:
+            if d.role == "downstream":
+                return d
+        return self.dams[0]
 
     def get_unverified_fields(self) -> List[str]:
         """Recursively scan model and return dotted paths of unverified fields."""

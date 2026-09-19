@@ -18,8 +18,9 @@ venv/
 htmlcov/
 .ruff_cache/
 
-# Geospatial Cache & Local Data
+# Geospatial Cache, Local Data & Tools
 cache/
+tools/
 *.tif
 *.tiff
 *.shp
@@ -27,6 +28,16 @@ cache/
 *.dbf
 *.prj
 *.kml
+
+# Credentials, Keys, and Environment Files
+.env
+.env.*
+!.env.example
+keys/
+keys
+*key*.json
+*credentials*.json
+service_account*.json
 
 # IDE
 .idea/

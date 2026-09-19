@@ -14,7 +14,7 @@ import rasterio
 from rasterio.transform import from_origin
 from shapely.geometry import LineString, Point, Polygon
 
-from damsight.config import SiteConfig, load_site_config
+from damsight.config import SiteConfig, is_todo_value, load_site_config
 from damsight.data.dem import condition_and_save_dem
 from damsight.data.exposure import ingest_population, ingest_vector_exposure
 from damsight.data.landcover import generate_landcover_and_manning
@@ -166,7 +166,17 @@ def run_ingestion(
         config = site
 
     site_id = config.site_id
-    target_crs = config.crs
+    if is_todo_value(config.crs):
+        if allow_synthetic_fallback:
+            target_crs = "EPSG:32643"  # UTM 43N demo reach default
+            logger.warning(f"Site CRS is unverified ('{config.crs}'). Using fallback CRS '{target_crs}'.")
+        else:
+            raise MissingDatasetError(
+                f"Site CRS is unverified ('{config.crs}'). Please specify a valid projected CRS in site config."
+            )
+    else:
+        target_crs = config.crs
+
     res_m = config.solver.mesh_resolution_m
 
     base_cache = cache_root or (Path(__file__).resolve().parent.parent.parent.parent / "cache")
@@ -256,6 +266,7 @@ def run_ingestion(
     # 5. Compile report.json
     report: Dict[str, Any] = {
         "site_id": site_id,
+        "data_status": "unverified" if (not config.is_fully_verified or allow_synthetic_fallback) else config.data_status.dam_parameters,
         "crs": target_crs,
         "resolution_m": res_m,
         "grid_shape": [int(master_profile["height"]), int(master_profile["width"])],

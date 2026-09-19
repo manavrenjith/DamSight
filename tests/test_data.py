@@ -25,15 +25,28 @@ def synthetic_site_config(tmp_path):
         "data_status": {"dam_parameters": "synthetic"},
         "crs": "EPSG:32643",
         "aoi": {"bbox": [600000.0, 2500000.0, 601800.0, 2501800.0]},
-        "dam": {
-            "location": [600500.0, 2501000.0],
-            "crest_elevation_m": 75.0,
-            "dam_height_m": 25.0,
-            "reservoir_volume_m3": 5000000.0,
-            "stage_storage_csv": None,
-            "breach_types": ["overtopping", "piping"],
-            "source": "Synthetic fixture",
-        },
+        "dams": [
+            {
+                "id": "dam_1",
+                "role": "single",
+                "location": [600500.0, 2501000.0],
+                "crest_elevation_m": 75.0,
+                "dam_height_m": 25.0,
+                "reservoir_volume_m3": 5000000.0,
+                "stage_storage_csv": None,
+                "dam_type": "embankment",
+                "breach_types": ["overtopping", "piping"],
+                "source": "Synthetic fixture",
+            }
+        ],
+        "scenarios": [
+            {
+                "id": "scenario_1",
+                "kind": "hindcast",
+                "breach_dam": "dam_1",
+                "breach_type": "overtopping",
+            }
+        ],
         "inputs": {
             "dem": {"source": "copernicus_30m", "path": None},
             "landcover": "esa_worldcover",
@@ -43,7 +56,8 @@ def synthetic_site_config(tmp_path):
         },
         "reference_events": [],
         "solver": {
-            "far_field": "anuga",
+            "far_field": "delft3dfm",
+            "baseline": "anuga",
             "near_field": "none",
             "mesh_resolution_m": 30.0,
         },
