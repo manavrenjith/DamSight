@@ -1,0 +1,58 @@
+site_id: site_a
+name: "TODO_VERIFY: Machhu-II Dam (Morbi)"
+type: dam
+data_status:
+  dam_parameters: unverified
+crs: "EPSG:32643"
+aoi:
+  bbox:
+    - "TODO_VERIFY"
+    - "TODO_VERIFY"
+    - "TODO_VERIFY"
+    - "TODO_VERIFY"
+dam:
+  location:
+    - "TODO_VERIFY"
+    - "TODO_VERIFY"
+  crest_elevation_m: "TODO_VERIFY"
+  dam_height_m: "TODO_VERIFY"
+  reservoir_volume_m3: "TODO_VERIFY"
+  stage_storage_csv: null
+  breach_types:
+    - overtopping
+    - piping
+  source: "TODO_VERIFY: Pending official India-WRIS / NRLD citation"
+inputs:
+  dem:
+    source: copernicus_30m
+    path: null
+  landcover: esa_worldcover
+  population: worldpop
+  buildings: osm
+  roads: osm
+reference_events:
+  - name: "TODO_VERIFY: Machhu-II 1979 Historical Extent"
+    extent: data/site_a/reference_extent.geojson
+    source: "TODO_VERIFY: Historical study reference"
+solver:
+  far_field: anuga
+  near_field: none
+  mesh_resolution_m: 30.0
+ensemble:
+  n_members: 200
+  parameters:
+    breach_width:
+      sigma_ln: 0.3
+    formation_time:
+      sigma_ln: 0.4
+    peak_outflow:
+      sigma_ln: 0.3
+    reservoir_level_m:
+      range:
+        - "TODO_VERIFY"
+        - "TODO_VERIFY"
+evacuation:
+  walking_speed_kmh: 4.0
+  vehicle_speed_kmh: 30.0
+  road_closure_depth_m: 0.3
+  safety_margin_min: 10.0
