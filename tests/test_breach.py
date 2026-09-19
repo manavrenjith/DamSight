@@ -1,12 +1,11 @@
 """Comprehensive unit tests for Froehlich breach parameter equations and hydrograph generation."""
 
 import json
-from pathlib import Path
+
 import numpy as np
 import pytest
 
 from damsight.breach.froehlich import (
-    BreachParameters,
     estimate_breach_parameters,
     froehlich_breach_width,
     froehlich_formation_time,
@@ -173,10 +172,14 @@ def test_mass_conservation_and_clamp_binding():
         invert_elevation_m=50.0,
         crest_elevation_m=75.0,
         max_volume_m3=v_init,
+        dead_storage_m3=0.0,
     )
 
     res = generate_breach_hydrograph(
         params=params,
+        crest_elevation_m=75.0,
+        cd_rect=1.70,
+        cd_tri=1.35,
         stage_storage=stage_storage,
         dt_s=5.0,
     )
@@ -188,15 +191,15 @@ def test_mass_conservation_and_clamp_binding():
     assert res.total_outflow_volume_m3 > 0.90 * v_init
 
     # (i) Assert that the min() clamp NEVER bound before the recession tail
-    assert res.clamp_active_before_recession == 0, (
-        f"Clamp bound {res.clamp_active_before_recession} times before the recession tail!"
-    )
+    assert (
+        res.clamp_active_before_recession == 0
+    ), f"Clamp bound {res.clamp_active_before_recession} times before the recession tail!"
 
 
 def test_dead_storage_never_drained():
     """(b)(ii) Test with dead storage below breach invert showing drawdown never removes it."""
     v_active = 6.0e6  # 6.0 MCM above breach invert
-    v_dead = 2.0e6    # 2.0 MCM dead storage below invert
+    v_dead = 2.0e6  # 2.0 MCM dead storage below invert
     v_total = v_active + v_dead
     h_b = 20.0
     invert_z = 50.0
@@ -220,8 +223,10 @@ def test_dead_storage_never_drained():
 
     res = generate_breach_hydrograph(
         params=params,
-        stage_storage=stage_storage,
         crest_elevation_m=crest_z,
+        cd_rect=1.70,
+        cd_tri=1.35,
+        stage_storage=stage_storage,
         dt_s=5.0,
     )
 
@@ -250,16 +255,36 @@ def test_dt_convergence():
     )
 
     # Run with dt = 10.0 s
-    res_dt1 = generate_breach_hydrograph(params=params, dt_s=10.0)
+    res_dt1 = generate_breach_hydrograph(
+        params=params,
+        crest_elevation_m=100.0,
+        cd_rect=1.70,
+        cd_tri=1.35,
+        dt_s=10.0,
+    )
 
     # Run with dt/2 = 5.0 s
-    res_dt2 = generate_breach_hydrograph(params=params, dt_s=5.0)
+    res_dt2 = generate_breach_hydrograph(
+        params=params,
+        crest_elevation_m=100.0,
+        cd_rect=1.70,
+        cd_tri=1.35,
+        dt_s=5.0,
+    )
 
     # Relative difference in peak discharge
-    peak_diff_pct = abs(res_dt1.peak_discharge_hydrograph_m3s - res_dt2.peak_discharge_hydrograph_m3s) / res_dt2.peak_discharge_hydrograph_m3s * 100.0
+    peak_diff_pct = (
+        abs(res_dt1.peak_discharge_hydrograph_m3s - res_dt2.peak_discharge_hydrograph_m3s)
+        / res_dt2.peak_discharge_hydrograph_m3s
+        * 100.0
+    )
 
     # Relative difference in total volume
-    vol_diff_pct = abs(res_dt1.total_outflow_volume_m3 - res_dt2.total_outflow_volume_m3) / res_dt2.total_outflow_volume_m3 * 100.0
+    vol_diff_pct = (
+        abs(res_dt1.total_outflow_volume_m3 - res_dt2.total_outflow_volume_m3)
+        / res_dt2.total_outflow_volume_m3
+        * 100.0
+    )
 
     assert peak_diff_pct < 2.0, f"Peak discharge dt convergence error {peak_diff_pct:.3f}% >= 2.0%"
     assert vol_diff_pct < 2.0, f"Total volume dt convergence error {vol_diff_pct:.3f}% >= 2.0%"
@@ -276,7 +301,13 @@ def test_monotonic_reservoir_drawdown():
         mode="piping",
     )
 
-    res = generate_breach_hydrograph(params=params, dt_s=10.0)
+    res = generate_breach_hydrograph(
+        params=params,
+        crest_elevation_m=100.0,
+        cd_rect=1.70,
+        cd_tri=1.35,
+        dt_s=10.0,
+    )
 
     assert res.drawdown_monotonic is True
     stage_diffs = np.diff(res.stage_m)
@@ -304,9 +335,10 @@ def test_hydrograph_peak_vs_empirical_qp_side_by_side(capsys):
 
     res = generate_breach_hydrograph(
         params=params,
-        dt_s=dt_s,
+        crest_elevation_m=100.0,
         cd_rect=cd_rect,
         cd_tri=cd_tri,
+        dt_s=dt_s,
     )
 
     q_peak_hydrograph = res.peak_discharge_hydrograph_m3s
@@ -353,7 +385,12 @@ def test_natural_dam_illustrative_handling():
     assert abs(nat_params.breach_width_avg_m - 1.25 * std_params.breach_width_avg_m) < 0.05
 
     # Check hydrograph metadata reflects illustrative status
-    res = generate_breach_hydrograph(params=nat_params)
+    res = generate_breach_hydrograph(
+        params=nat_params,
+        crest_elevation_m=100.0,
+        cd_rect=1.70,
+        cd_tri=1.35,
+    )
     assert res.is_natural_dam is True
 
 
@@ -362,11 +399,11 @@ def test_non_embankment_dam_type_raises_error():
     v_init = 1.0e7
     h_b = 25.0
 
-    # Arch dam (like Idukki)
+    # SYNTHETIC_TEST_DAM (arch)
     with pytest.raises(ValueError, match="only for embankment dams"):
         estimate_breach_parameters(v_init, h_b, dam_type="arch")
 
-    # Masonry gravity dam (like Mullaperiyar)
+    # SYNTHETIC_TEST_DAM (masonry gravity)
     with pytest.raises(ValueError, match="only for embankment dams"):
         froehlich_breach_width(v_init, h_b, dam_type="masonry_gravity")
 
@@ -383,7 +420,14 @@ def test_hydrograph_file_exports(tmp_path):
     h_b = 12.0
 
     params = estimate_breach_parameters(v_init, h_b)
-    res = generate_breach_hydrograph(params=params, dt_s=10.0, total_duration_s=3600.0)
+    res = generate_breach_hydrograph(
+        params=params,
+        crest_elevation_m=100.0,
+        cd_rect=1.70,
+        cd_tri=1.35,
+        dt_s=10.0,
+        total_duration_s=3600.0,
+    )
 
     csv_path = tmp_path / "hydrograph.csv"
     meta_path = tmp_path / "hydrograph_meta.json"
@@ -403,3 +447,105 @@ def test_hydrograph_file_exports(tmp_path):
     assert meta["drawdown_monotonic"] is True
     assert meta["parameter_status"] == "verified_formula"
     assert "clamp_active_before_recession" in meta
+
+
+def test_hydrograph_recession_limb_decays_without_discontinuity():
+    """Verify that breach discharge Q(t) decays smoothly without discontinuities after peak."""
+    v_init = 2.5e7  # 25 MCM
+    h_b = 30.0
+    h_w = 27.5
+    crest_z = 85.0
+    cd_rect = 1.70
+    cd_tri = 1.35
+    dt_s = 5.0
+
+    params = estimate_breach_parameters(
+        reservoir_volume_m3=v_init,
+        breach_height_m=h_b,
+        water_depth_m=h_w,
+        mode="overtopping",
+    )
+    res = generate_breach_hydrograph(
+        params=params,
+        crest_elevation_m=crest_z,
+        cd_rect=cd_rect,
+        cd_tri=cd_tri,
+        dt_s=dt_s,
+    )
+
+    peak_idx = int(np.argmax(res.discharge_m3s))
+    q_recession = res.discharge_m3s[peak_idx:]
+    peak_q = res.peak_discharge_hydrograph_m3s
+
+    # Ensure run was extended until Q < 1% of peak
+    assert res.discharge_m3s[-1] < 0.01 * peak_q
+
+    # Check that after peak, Q decays monotonically without sudden upward spikes
+    diffs = np.diff(q_recession)
+    assert np.all(
+        diffs <= 1e-6
+    ), f"Found upward spike in recession limb: max diff = {np.max(diffs)}"
+
+    # Continuity: step-to-step drop relative to peak must be small (< 1% per step dt)
+    max_step_drop = float(np.max(np.abs(diffs)))
+    max_step_drop_rel = max_step_drop / peak_q
+    assert (
+        max_step_drop_rel < 0.01
+    ), f"Discontinuity detected: step drop {max_step_drop:.2f} m3/s ({max_step_drop_rel*100:.2f}% of peak)"
+
+
+def test_hydrograph_tail_asymptotic_recession_and_clamp_invariance():
+    """Verify asymptotic recession:
+    1. For every step after peak where Q[i] >= 0.01*peak, Q[i+1] >= 0.85*Q[i].
+    2. Residual above-invert volume < 1% of initial stored active volume.
+    3. Zero clamp bindings after peak while Q >= 0.01*peak.
+    """
+    v_init = 2.5e7  # 25 MCM
+    h_b = 30.0
+    h_w = 27.5
+    crest_z = 85.0
+    cd_rect = 1.70
+    cd_tri = 1.35
+    dt_s = 5.0
+
+    params = estimate_breach_parameters(
+        reservoir_volume_m3=v_init,
+        breach_height_m=h_b,
+        water_depth_m=h_w,
+        mode="overtopping",
+    )
+    res = generate_breach_hydrograph(
+        params=params,
+        crest_elevation_m=crest_z,
+        cd_rect=cd_rect,
+        cd_tri=cd_tri,
+        dt_s=dt_s,
+    )
+
+    peak_q = res.peak_discharge_hydrograph_m3s
+    peak_idx = int(np.argmax(res.discharge_m3s))
+    threshold_q = 0.01 * peak_q
+
+    # 1. Smooth recession test: for every step after peak where Q[i] >= 0.01*peak, Q[i+1] >= 0.85*Q[i]
+    for i in range(peak_idx, len(res.discharge_m3s) - 1):
+        q_curr = res.discharge_m3s[i]
+        q_next = res.discharge_m3s[i + 1]
+        if q_curr >= threshold_q:
+            ratio = q_next / q_curr
+            assert (
+                ratio >= 0.85
+            ), f"Step {i} (t={res.time_s[i]}s): Q[i+1]/Q[i] = {ratio:.4f} < 0.85 (Q[i]={q_curr:.2f}, Q[i+1]={q_next:.2f})"
+
+    # 2. Residual above-invert volume < 1% of stored active volume
+    residual_vol = res.remaining_reservoir_volume_m3 - (
+        res.initial_stored_volume_m3 - res.active_storage_volume_m3
+    )
+    residual_pct = (residual_vol / res.active_storage_volume_m3) * 100.0
+    assert (
+        residual_pct < 1.0
+    ), f"Residual above-invert volume {residual_pct:.3f}% is not < 1.0% of active storage ({residual_vol:.1f} m3)"
+
+    # 3. Zero clamp bindings after peak while Q >= 0.01*peak
+    assert (
+        res.clamp_active_steps == 0
+    ), f"Found {res.clamp_active_steps} clamp bindings during recession!"

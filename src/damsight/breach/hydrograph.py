@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import csv
 import json
-import math
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -23,23 +21,25 @@ class StageStorageCurve:
         invert_elevation_m: float,
         crest_elevation_m: float,
         max_volume_m3: float,
-        dead_storage_m3: float = 0.0,
-        bed_elevation_m: Optional[float] = None,
-        csv_path: Optional[Union[str, Path]] = None,
+        dead_storage_m3: float,
+        bed_elevation_m: float | None = None,
+        csv_path: str | Path | None = None,
         power_law_exponent: float = 2.0,
     ):
         self.invert_elevation_m = float(invert_elevation_m)
         self.crest_elevation_m = float(crest_elevation_m)
         self.max_volume_m3 = float(max_volume_m3)
         self.dead_storage_m3 = float(dead_storage_m3)
-        self.bed_elevation_m = float(bed_elevation_m) if bed_elevation_m is not None else self.invert_elevation_m
+        self.bed_elevation_m = (
+            float(bed_elevation_m) if bed_elevation_m is not None else self.invert_elevation_m
+        )
         self.height_m = max(0.1, self.crest_elevation_m - self.invert_elevation_m)
         self.dead_height_m = max(0.0, self.invert_elevation_m - self.bed_elevation_m)
         self.active_volume_m3 = max(1.0, self.max_volume_m3 - self.dead_storage_m3)
         self.p = float(power_law_exponent)
 
-        self.stages: Optional[np.ndarray] = None
-        self.volumes: Optional[np.ndarray] = None
+        self.stages: np.ndarray | None = None
+        self.volumes: np.ndarray | None = None
 
         if csv_path is not None and Path(csv_path).exists():
             self._load_from_csv(Path(csv_path))
@@ -47,8 +47,8 @@ class StageStorageCurve:
     def _load_from_csv(self, path: Path) -> None:
         """Load stage-storage table from CSV."""
         df = pd.read_csv(path)
-        stage_col = [c for c in df.columns if "stage" in c.lower() or "elev" in c.lower()][0]
-        vol_col = [c for c in df.columns if "vol" in c.lower()][0]
+        stage_col = next(c for c in df.columns if "stage" in c.lower() or "elev" in c.lower())
+        vol_col = next(c for c in df.columns if "vol" in c.lower())
         sorted_df = df.sort_values(by=stage_col)
         self.stages = sorted_df[stage_col].to_numpy(dtype=float)
         self.volumes = sorted_df[vol_col].to_numpy(dtype=float)
@@ -81,12 +81,12 @@ class StageStorageCurve:
             if self.dead_storage_m3 > 0 and self.dead_height_m > 0:
                 h_dead = max(0.0, stage_m - self.bed_elevation_m)
                 frac = min(1.0, h_dead / self.dead_height_m)
-                return float(self.dead_storage_m3 * (frac ** self.p))
+                return float(self.dead_storage_m3 * (frac**self.p))
             return 0.0
 
         h = stage_m - self.invert_elevation_m
         frac = min(1.0, h / self.height_m)
-        vol = self.dead_storage_m3 + self.active_volume_m3 * (frac ** self.p)
+        vol = self.dead_storage_m3 + self.active_volume_m3 * (frac**self.p)
         return float(vol)
 
 
@@ -108,33 +108,51 @@ class HydrographResult:
     initial_stored_volume_m3: float
     active_storage_volume_m3: float
     remaining_reservoir_volume_m3: float
-    mass_conserved: bool
-    mass_balance_error_pct: float
-    drawdown_monotonic: bool
-    is_natural_dam: bool
-    clamp_active_steps: int
-    clamp_active_before_recession: int
+    residual_storage_fraction: float = 0.0
+    mass_conserved: bool = True
+    mass_balance_error_pct: float = 0.0
+    drawdown_monotonic: bool = True
+    is_natural_dam: bool = False
+    clamp_active_steps: int = 0
+    clamp_active_before_recession: int = 0
+    first_clamp_step: int | None = None
 
     def to_dataframe(self) -> pd.DataFrame:
         """Export time series to pandas DataFrame."""
-        return pd.DataFrame({
-            "time_s": self.time_s,
-            "discharge_m3s": np.round(self.discharge_m3s, 3),
-            "stage_m": np.round(self.stage_m, 3),
-            "volume_m3": np.round(self.volume_m3, 1),
-            "breach_width_m": np.round(self.breach_width_m, 3),
-            "breach_invert_m": np.round(self.breach_invert_m, 3),
-        })
+        return pd.DataFrame(
+            {
+                "time_s": self.time_s,
+                "discharge_m3s": np.round(self.discharge_m3s, 3),
+                "stage_m": np.round(self.stage_m, 3),
+                "volume_m3": np.round(self.volume_m3, 1),
+                "breach_width_m": np.round(self.breach_width_m, 3),
+                "breach_invert_m": np.round(self.breach_invert_m, 3),
+            }
+        )
 
-    def save_csv(self, path: Union[str, Path]) -> None:
-        """Save hydrograph time series to CSV."""
+    def save_csv(self, path: str | Path) -> None:
+        """Save hydrograph time series to CSV with explicit utf-8 encoding."""
         df = self.to_dataframe()
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(path, index=False)
+        df.to_csv(path, index=False, encoding="utf-8")
 
-    def save_metadata(self, path: Union[str, Path]) -> None:
-        """Save simulation metadata and comparison metrics to JSON."""
+    def save_metadata(self, path: str | Path) -> None:
+        """Save simulation metadata and comparison metrics to JSON with explicit utf-8 encoding."""
+        residual_above_invert = max(
+            0.0,
+            self.remaining_reservoir_volume_m3
+            - (self.initial_stored_volume_m3 - self.active_storage_volume_m3),
+        )
+        residual_frac = (
+            residual_above_invert / self.active_storage_volume_m3
+            if self.active_storage_volume_m3 > 0
+            else 0.0
+        )
         meta = {
+            "units": {
+                "discharge": "m³/s",
+                "volume": "m³",
+            },
             "peak_hydrograph_m3s": round(self.peak_discharge_hydrograph_m3s, 2),
             "empirical_froehlich_qp_m3s": round(self.empirical_peak_qp_m3s, 2),
             "time_to_peak_s": round(self.time_to_peak_s, 1),
@@ -143,6 +161,8 @@ class HydrographResult:
             "initial_stored_volume_m3": round(self.initial_stored_volume_m3, 1),
             "active_storage_volume_m3": round(self.active_storage_volume_m3, 1),
             "remaining_reservoir_volume_m3": round(self.remaining_reservoir_volume_m3, 1),
+            "residual_above_invert_volume_m3": round(residual_above_invert, 1),
+            "residual_above_invert_fraction": round(residual_frac, 6),
             "mass_conserved": self.mass_conserved,
             "mass_balance_error_pct": round(self.mass_balance_error_pct, 4),
             "drawdown_monotonic": self.drawdown_monotonic,
@@ -150,20 +170,22 @@ class HydrographResult:
             "parameter_status": "illustrative" if self.is_natural_dam else "verified_formula",
             "clamp_active_steps": self.clamp_active_steps,
             "clamp_active_before_recession": self.clamp_active_before_recession,
+            "first_clamp_step": self.first_clamp_step,
         }
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(meta, f, indent=2)
+            json.dump(meta, f, indent=2, ensure_ascii=False)
 
 
 def generate_breach_hydrograph(
     params: BreachParameters,
-    stage_storage: Optional[StageStorageCurve] = None,
-    total_duration_s: Optional[float] = None,
+    crest_elevation_m: float,
+    cd_rect: float,
+    cd_tri: float,
+    stage_storage: StageStorageCurve | None = None,
+    total_duration_s: float | None = None,
     dt_s: float = 10.0,
-    crest_elevation_m: float = 100.0,
-    cd_rect: float = 1.70,
-    cd_tri: float = 1.35,
+    cutoff_q_ratio: float | None = None,
 ) -> HydrographResult:
     """Generate physically consistent outflow hydrograph through growing trapezoidal breach.
 
@@ -176,7 +198,7 @@ def generate_breach_hydrograph(
     v_active = params.reservoir_volume_m3
     h_b = params.breach_height_m
     t_f = max(dt_s, params.formation_time_s)
-    z_crest = crest_elevation_m
+    z_crest = float(crest_elevation_m)
     z_bottom = z_crest - h_b
 
     if stage_storage is None:
@@ -193,16 +215,12 @@ def generate_breach_hydrograph(
     v_dead = stage_storage.dead_storage_m3
     v_init_total = v_active + v_dead
 
-    # Simulation runs until reservoir active storage is drained
-    duration = total_duration_s or max(t_f * 3.5, 7200.0)
-    n_steps = int(math.ceil(duration / dt_s)) + 1
-
-    time_arr = np.zeros(n_steps, dtype=np.float32)
-    q_arr = np.zeros(n_steps, dtype=np.float32)
-    stage_arr = np.zeros(n_steps, dtype=np.float32)
-    vol_arr = np.zeros(n_steps, dtype=np.float32)
-    width_arr = np.zeros(n_steps, dtype=np.float32)
-    invert_arr = np.zeros(n_steps, dtype=np.float32)
+    time_list: list[float] = []
+    q_list: list[float] = []
+    stage_list: list[float] = []
+    vol_list: list[float] = []
+    width_list: list[float] = []
+    invert_list: list[float] = []
 
     curr_vol = v_init_total
     curr_stage = stage_storage.volume_to_stage(curr_vol)
@@ -212,20 +230,25 @@ def generate_breach_hydrograph(
 
     clamp_bind_count = 0
     clamp_before_recession = 0
+    first_clamp_step: int | None = None
 
-    for i in range(n_steps):
-        t = i * dt_s
-        time_arr[i] = t
-        stage_arr[i] = curr_stage
-        vol_arr[i] = curr_vol
+    step = 0
+    peak_q = 0.0
+    passed_peak = False
+
+    while True:
+        t = step * dt_s
+        time_list.append(t)
+        stage_list.append(curr_stage)
+        vol_list.append(curr_vol)
 
         # Breach expansion phase [0, t_f]
         frac_formed = min(1.0, t / t_f)
         z_b = z_crest - (h_b * frac_formed)
         w_b = final_w * frac_formed
 
-        invert_arr[i] = z_b
-        width_arr[i] = w_b
+        invert_list.append(z_b)
+        width_list.append(w_b)
 
         # Head of water above current breach invert
         h_water = max(0.0, curr_stage - z_b)
@@ -235,18 +258,44 @@ def generate_breach_hydrograph(
 
         if h_water > 0.0 and available_vol > 0.0:
             # Broad-crested trapezoidal weir flow
-            q_weir = cd_rect * w_b * (h_water ** 1.5) + cd_tri * side_z * (h_water ** 2.5)
-
-            # Mass conservation clamp
+            q_weir = cd_rect * w_b * (h_water**1.5) + cd_tri * side_z * (h_water**2.5)
             needed_vol = q_weir * dt_s
-            if needed_vol > available_vol:
-                clamp_bind_count += 1
-                # Check if this clamp occurred before recession tail (defined as remaining > 5% of active storage)
-                if available_vol > 0.05 * v_active:
-                    clamp_before_recession += 1
-                actual_drain_vol = available_vol
+
+            # Adaptive sub-stepping near the asymptotic recession tail to avoid discrete overshoot
+            if needed_vol > 0.10 * available_vol and available_vol > 0.0:
+                n_sub = min(200, max(2, int(np.ceil(needed_vol / (0.05 * available_vol)))))
+                sub_dt = dt_s / n_sub
+                v_sub = curr_vol
+                drain_accum = 0.0
+                for _ in range(n_sub):
+                    st_sub = stage_storage.volume_to_stage(v_sub)
+                    hw_sub = max(0.0, st_sub - z_b)
+                    qw_sub = cd_rect * w_b * (hw_sub**1.5) + cd_tri * side_z * (hw_sub**2.5)
+                    sub_avail = max(0.0, v_sub - v_dead)
+                    sub_needed = qw_sub * sub_dt
+                    if sub_needed > sub_avail:
+                        clamp_bind_count += 1
+                        if first_clamp_step is None:
+                            first_clamp_step = step
+                        if available_vol > 0.05 * v_active:
+                            clamp_before_recession += 1
+                        dv = sub_avail
+                    else:
+                        dv = sub_needed
+                    v_sub = max(v_dead, v_sub - dv)
+                    drain_accum += dv
+
+                actual_drain_vol = drain_accum
             else:
-                actual_drain_vol = needed_vol
+                if needed_vol > available_vol:
+                    clamp_bind_count += 1
+                    if first_clamp_step is None:
+                        first_clamp_step = step
+                    if available_vol > 0.05 * v_active:
+                        clamp_before_recession += 1
+                    actual_drain_vol = available_vol
+                else:
+                    actual_drain_vol = needed_vol
 
             actual_q = actual_drain_vol / dt_s
             curr_vol = max(v_dead, curr_vol - actual_drain_vol)
@@ -254,7 +303,35 @@ def generate_breach_hydrograph(
         else:
             actual_q = 0.0
 
-        q_arr[i] = actual_q
+        q_list.append(actual_q)
+
+        if actual_q > peak_q:
+            peak_q = actual_q
+        elif t >= t_f and actual_q < peak_q:
+            passed_peak = True
+
+        step += 1
+
+        if total_duration_s is not None:
+            if t >= total_duration_s:
+                break
+        else:
+            if cutoff_q_ratio is not None and passed_peak and actual_q <= cutoff_q_ratio * peak_q:
+                break
+            # Continue until active volume is drained and discharge drops to negligible level
+            if passed_peak and (
+                actual_q == 0.0 or (available_vol <= 1e-4 and actual_q < 0.01 * peak_q)
+            ):
+                break
+            if step > 200000:
+                break
+
+    time_arr = np.array(time_list, dtype=np.float32)
+    q_arr = np.array(q_list, dtype=np.float32)
+    stage_arr = np.array(stage_list, dtype=np.float32)
+    vol_arr = np.array(vol_list, dtype=np.float32)
+    width_arr = np.array(width_list, dtype=np.float32)
+    invert_arr = np.array(invert_list, dtype=np.float32)
 
     peak_q = float(np.max(q_arr))
     time_to_peak = float(time_arr[np.argmax(q_arr)])
@@ -265,6 +342,7 @@ def generate_breach_hydrograph(
 
     stage_diffs = np.diff(stage_arr)
     drawdown_monotonic = bool(np.all(stage_diffs <= 1e-6))
+    residual_storage_fraction = max(0.0, curr_vol - v_dead) / v_active if v_active > 0 else 0.0
 
     return HydrographResult(
         time_s=time_arr,
@@ -280,10 +358,26 @@ def generate_breach_hydrograph(
         initial_stored_volume_m3=v_init_total,
         active_storage_volume_m3=v_active,
         remaining_reservoir_volume_m3=curr_vol,
+        residual_storage_fraction=residual_storage_fraction,
         mass_conserved=mass_conserved,
         mass_balance_error_pct=mass_err_pct,
         drawdown_monotonic=drawdown_monotonic,
         is_natural_dam=params.is_natural_dam,
         clamp_active_steps=clamp_bind_count,
         clamp_active_before_recession=clamp_before_recession,
+        first_clamp_step=first_clamp_step,
     )
+
+
+def get_dam_breach_inputs(
+    dam: Any,
+    allow_unverified: bool = False,
+    fallbacks: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    """Single designated route from a SiteConfig dam to breach and solver inputs.
+
+    Enforces allow_unverified guard by delegating strictly to consume_dam_parameters.
+    """
+    from damsight.config import consume_dam_parameters
+
+    return consume_dam_parameters(dam, allow_unverified=allow_unverified, fallbacks=fallbacks)

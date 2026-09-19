@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 
 @dataclass
@@ -24,7 +24,7 @@ class BreachParameters:
     empirical_peak_qp_m3s: float
     is_natural_dam: bool = False
     parameter_status: str = "verified_formula"  # verified_formula | illustrative
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 def check_embankment_dam_type(dam_type: str) -> None:
@@ -59,7 +59,7 @@ def froehlich_breach_width(
         raise ValueError("Breach height must be strictly positive")
 
     k_o = 1.3 if mode.lower() == "overtopping" else 1.0
-    b_avg = 0.27 * k_o * (reservoir_volume_m3 ** 0.32) * (breach_height_m ** 0.04)
+    b_avg = 0.27 * k_o * (reservoir_volume_m3**0.32) * (breach_height_m**0.04)
     return float(b_avg)
 
 
@@ -84,7 +84,7 @@ def froehlich_formation_time(
     if breach_height_m <= 0:
         raise ValueError("Breach height must be strictly positive")
 
-    ratio = reservoir_volume_m3 / (g * (breach_height_m ** 2))
+    ratio = reservoir_volume_m3 / (g * (breach_height_m**2))
     t_f = 63.2 * math.sqrt(ratio)
     return float(t_f)
 
@@ -108,16 +108,16 @@ def froehlich_peak_outflow(
     if water_depth_m <= 0:
         raise ValueError("Water depth must be strictly positive")
 
-    q_p = 0.607 * (reservoir_volume_m3 ** 0.295) * (water_depth_m ** 1.24)
+    q_p = 0.607 * (reservoir_volume_m3**0.295) * (water_depth_m**1.24)
     return float(q_p)
 
 
 def estimate_breach_parameters(
     reservoir_volume_m3: float,
     breach_height_m: float,
-    water_depth_m: Optional[float] = None,
+    water_depth_m: float | None = None,
     mode: Literal["overtopping", "piping"] = "overtopping",
-    side_slope_z: Optional[float] = None,
+    side_slope_z: float | None = None,
     dam_type: str = "embankment",
     is_natural_dam: bool = False,
 ) -> BreachParameters:
@@ -130,7 +130,9 @@ def estimate_breach_parameters(
     check_embankment_dam_type(dam_type)
     h_w = water_depth_m if water_depth_m is not None else breach_height_m
 
-    b_avg = froehlich_breach_width(reservoir_volume_m3, breach_height_m, mode=mode, dam_type=dam_type)
+    b_avg = froehlich_breach_width(
+        reservoir_volume_m3, breach_height_m, mode=mode, dam_type=dam_type
+    )
     t_f = froehlich_formation_time(reservoir_volume_m3, breach_height_m, dam_type=dam_type)
     q_p = froehlich_peak_outflow(reservoir_volume_m3, h_w, dam_type=dam_type)
 
