@@ -2,21 +2,26 @@
 
 import warnings
 from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
-from damsight.config import SiteConfig, UnverifiedValueWarning, load_site_config
+from damsight.config import (
+    UnverifiedValueWarning,
+    consume_dam_parameters,
+    load_site_config,
+)
 
 
 @pytest.fixture
 def valid_v2_verified_config_dict():
-    """A fully verified v2 configuration dictionary with concrete numeric values."""
+    """A synthetic v2 configuration dictionary with concrete numeric values."""
     return {
-        "site_id": "site_verified",
-        "name": "Machhu-I / Machhu-II Chain (Verified Dataset)",
+        "site_id": "site_synthetic",
+        "name": "SYNTHETIC_TEST_DAM Cascade (Synthetic Test Dataset)",
         "type": "cascade",
         "data_status": {
-            "dam_parameters": "verified",
+            "dam_parameters": "synthetic",
         },
         "crs": "EPSG:32643",
         "aoi": {
@@ -24,29 +29,29 @@ def valid_v2_verified_config_dict():
         },
         "dams": [
             {
-                "id": "machhu_1",
+                "id": "SYNTHETIC_TEST_DAM_1",
                 "role": "upstream",
                 "location": [70.85, 22.72],
                 "crest_elevation_m": 85.0,
                 "dam_height_m": 28.0,
                 "reservoir_volume_m3": 85000000.0,
-                "stage_storage_csv": "data/site_verified/machhu1_stage_storage.csv",
+                "stage_storage_csv": "data/site_synthetic/dam1_stage_storage.csv",
                 "dam_type": "embankment",
-                "source": "India-WRIS",
+                "source": "Synthetic fixture",
                 "verified": True,
             },
             {
-                "id": "machhu_2",
+                "id": "SYNTHETIC_TEST_DAM_2",
                 "role": "downstream",
                 "location": [70.89, 22.78],
                 "crest_elevation_m": 60.5,
                 "dam_height_m": 24.3,
                 "reservoir_volume_m3": 110000000.0,
-                "stage_storage_csv": "data/site_verified/machhu2_stage_storage.csv",
+                "stage_storage_csv": "data/site_synthetic/dam2_stage_storage.csv",
                 "dam_type": "embankment",
                 "spillway_capacity_m3s": 6100.0,
                 "breach_types": ["overtopping", "piping"],
-                "source": "India-WRIS / National Register of Large Dams",
+                "source": "Synthetic fixture",
                 "verified": True,
             },
         ],
@@ -54,13 +59,13 @@ def valid_v2_verified_config_dict():
             {
                 "id": "A1_hindcast_1979",
                 "kind": "hindcast",
-                "breach_dam": "machhu_2",
+                "breach_dam": "SYNTHETIC_TEST_DAM_2",
                 "breach_type": "overtopping",
             },
             {
                 "id": "A2_cascade_whatif",
                 "kind": "hypothetical",
-                "upstream_release_from": "machhu_1",
+                "upstream_release_from": "SYNTHETIC_TEST_DAM_1",
             },
         ],
         "inputs": {
@@ -75,10 +80,10 @@ def valid_v2_verified_config_dict():
         },
         "reference_events": [
             {
-                "name": "1979 Failure Extent",
+                "name": "Synthetic Reference Event",
                 "type": "historical",
-                "extent": "data/site_verified/reference_extent.geojson",
-                "source": "CWC Historical Report 1980",
+                "extent": "data/site_synthetic/reference_extent.geojson",
+                "source": "Synthetic benchmark source",
             }
         ],
         "solver": {
@@ -116,12 +121,12 @@ def test_valid_v2_verified_config_passes_cleanly(valid_v2_verified_config_dict):
         ]
         assert len(unverified_warnings) == 0, f"Expected 0 warnings, got: {unverified_warnings}"
 
-    assert config.site_id == "site_verified"
+    assert config.site_id == "site_synthetic"
     assert config.type == "cascade"
     assert len(config.dams) == 2
-    # Verify backwards-compatible primary dam accessor points to breach dam (machhu_2)
-    assert config.dam.id == "machhu_2"
-    assert config.dam.dam_height_m == 24.3
+    dam2 = config.get_dam("SYNTHETIC_TEST_DAM_2")
+    assert dam2.id == "SYNTHETIC_TEST_DAM_2"
+    assert dam2.dam_height_m == 24.3
     assert config.solver.baseline == "anuga"
     assert config.is_fully_verified is True
     assert len(config.get_unverified_fields()) == 0
@@ -194,3 +199,151 @@ def test_extra_forbidden_field_fails(valid_v2_verified_config_dict):
     with pytest.raises(ValidationError) as exc_info:
         load_site_config(valid_v2_verified_config_dict)
     assert "unexpected_custom_key" in str(exc_info.value)
+
+
+# --- RESTORED TESTS (ADAPTED TO V2 SCHEMA) ---
+
+
+def test_missing_required_field_site_id_fails(valid_v2_verified_config_dict):
+    """Test that omitting required site_id raises ValidationError."""
+    del valid_v2_verified_config_dict["site_id"]
+    with pytest.raises(ValidationError) as exc_info:
+        load_site_config(valid_v2_verified_config_dict)
+    assert "site_id" in str(exc_info.value)
+
+
+def test_missing_required_solver_fails(valid_v2_verified_config_dict):
+    """Test that omitting required solver configuration block raises ValidationError."""
+    del valid_v2_verified_config_dict["solver"]
+    with pytest.raises(ValidationError) as exc_info:
+        load_site_config(valid_v2_verified_config_dict)
+    assert "solver" in str(exc_info.value)
+
+
+def test_invalid_non_numeric_and_non_todo_field_fails(valid_v2_verified_config_dict):
+    """Test that non-numeric, non-TODO strings for float fields raise ValidationError."""
+    valid_v2_verified_config_dict["dams"][0]["dam_height_m"] = "invalid_text_value"
+    with pytest.raises(ValidationError) as exc_info:
+        load_site_config(valid_v2_verified_config_dict)
+    assert "neither a valid number nor a TODO marker" in str(exc_info.value)
+
+
+def test_invalid_bbox_length_fails(valid_v2_verified_config_dict):
+    """Test that aoi.bbox with length other than 4 raises ValidationError."""
+    valid_v2_verified_config_dict["aoi"]["bbox"] = [70.85, 22.75, 71.05]  # length 3 instead of 4
+    with pytest.raises(ValidationError) as exc_info:
+        load_site_config(valid_v2_verified_config_dict)
+    assert "expected 4 elements" in str(exc_info.value)
+
+
+# --- ALLOW_UNVERIFIED GUARD & V2 LOGIC TESTS ---
+
+
+def test_consuming_unverified_physical_value_raises_without_flag(valid_v2_verified_config_dict):
+    """Test that consuming a physical config parameter with TODO_VERIFY raises unless allow_unverified=True."""
+    valid_v2_verified_config_dict["dams"][0]["dam_height_m"] = "TODO_VERIFY"
+    with pytest.warns(UnverifiedValueWarning):
+        config = load_site_config(valid_v2_verified_config_dict)
+
+    dam = config.dams[0]
+    with pytest.raises(ValueError, match="allow_unverified=True"):
+        consume_dam_parameters(dam, allow_unverified=False)
+
+
+def test_consuming_unverified_physical_value_passes_with_flag_and_stamps_output(
+    valid_v2_verified_config_dict,
+):
+    """Test that consuming an unverified parameter with allow_unverified=True succeeds and stamps data_status=unverified."""
+    valid_v2_verified_config_dict["dams"][0]["dam_height_m"] = "TODO_VERIFY"
+    with pytest.warns(UnverifiedValueWarning):
+        config = load_site_config(valid_v2_verified_config_dict)
+
+    dam = config.dams[0]
+    output = consume_dam_parameters(
+        dam,
+        allow_unverified=True,
+        fallbacks={"dam_height_m": 28.0},
+    )
+    assert output["dam_height_m"] == 28.0
+    assert output["data_status"] == "unverified"
+
+
+def test_per_value_verified_false_takes_unverified_guard_path(valid_v2_verified_config_dict):
+    """Test that a {value, source, verified: false} dam value is treated as unverified by the guard."""
+    valid_v2_verified_config_dict["dams"][0]["dam_height_m"] = {
+        "value": 28.0,
+        "source": "Unverified rumor",
+        "verified": False,
+    }
+    with pytest.warns(UnverifiedValueWarning):
+        config = load_site_config(valid_v2_verified_config_dict)
+
+    dam = config.dams[0]
+    # Without allow_unverified, it raises
+    with pytest.raises(ValueError, match="allow_unverified=True"):
+        consume_dam_parameters(dam, allow_unverified=False)
+
+    # With allow_unverified=True, it passes and stamps output with data_status=unverified
+    output = consume_dam_parameters(dam, allow_unverified=True)
+    assert output["dam_height_m"] == 28.0
+    assert output["data_status"] == "unverified"
+
+
+def test_config_dam_requires_explicit_dam_id_when_a2_has_no_breach_dam(
+    valid_v2_verified_config_dict,
+):
+    """Test that config.dam raises ValueError when scenario A2 has no breach_dam, requiring an explicit dam_id."""
+    config = load_site_config(valid_v2_verified_config_dict)
+
+    # config.dam requires an explicit dam_id because A2 has no breach_dam
+    with pytest.raises(ValueError, match="explicit dam_id is required"):
+        _ = config.dam.id
+
+    with pytest.raises(ValueError, match="explicit dam_id is required"):
+        _ = config.get_dam()
+
+    # Providing explicit dam_id succeeds
+    dam1 = config.get_dam("SYNTHETIC_TEST_DAM_1")
+    assert dam1.id == "SYNTHETIC_TEST_DAM_1"
+
+    dam2 = config.dam("SYNTHETIC_TEST_DAM_2")
+    assert dam2.id == "SYNTHETIC_TEST_DAM_2"
+
+
+def test_site_a_data_status_dam_parameters_is_unverified():
+    """Test that configs/sites/site_a.yaml has data_status.dam_parameters == 'unverified'."""
+    yaml_path = Path(__file__).resolve().parent.parent / "configs" / "sites" / "site_a.yaml"
+    with pytest.warns(UnverifiedValueWarning):
+        config = load_site_config(yaml_path)
+
+    assert config.data_status.dam_parameters == "unverified"
+
+
+def test_real_site_a_guard_wiring_raises_without_flag_and_returns_unverified_with_flag():
+    """Test on real configs/sites/site_a.yaml: without allow_unverified get_dam_breach_inputs raises;
+    with allow_unverified=True and fallbacks it returns inputs plus data_status='unverified'.
+    """
+    from damsight.breach import get_dam_breach_inputs
+
+    yaml_path = Path(__file__).resolve().parent.parent / "configs" / "sites" / "site_a.yaml"
+    with pytest.warns(UnverifiedValueWarning):
+        config = load_site_config(yaml_path)
+
+    dam2 = config.get_dam("machhu_2")
+
+    # Without allow_unverified, it MUST raise ValueError
+    with pytest.raises(ValueError, match="allow_unverified=True"):
+        get_dam_breach_inputs(dam2, allow_unverified=False)
+
+    # With allow_unverified=True and synthetic fallbacks, it succeeds and stamps data_status="unverified"
+    fallbacks = {
+        "dam_height_m": 24.0,
+        "reservoir_volume_m3": 1.1e8,
+        "crest_elevation_m": 60.5,
+    }
+    inputs = get_dam_breach_inputs(dam2, allow_unverified=True, fallbacks=fallbacks)
+    assert inputs["dam_id"] == "machhu_2"
+    assert inputs["dam_height_m"] == 24.0
+    assert inputs["reservoir_volume_m3"] == 1.1e8
+    assert inputs["crest_elevation_m"] == 60.5
+    assert inputs["data_status"] == "unverified"
