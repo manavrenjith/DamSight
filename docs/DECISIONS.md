@@ -13,7 +13,7 @@
 | **D3** | Validation | Historical record for Site A (1979 event); Sentinel-1 for satellite-era events (Site C, Kerala 2018). | Section 7.10 |
 | **D4** | Data honesty | All Machhu figures stay `verified: false` until reconciled. Public sources disagree. | Ground Rule 3 |
 | **D5** | Earth Engine | Available. Non-commercial registration, Community quota tier (150 EECU-hours). Live detection enabled, cached fallback retained. | Section 7.9 |
-| **D6** | Delft3D FM | Proceed. Time-boxed setup (M4), benchmark first; ANUGA remains guaranteed baseline solver. | Section 7.4 |
+| **D6** | Delft3D FM & Solver Baseline | Proceed with Delft3D FM time-boxed setup (M4), benchmark first; ANUGA remains guaranteed baseline solver. ANUGA 4.0.0 installs natively on Windows from conda-forge; env = damsight (py3.11). | Section 7.4 |
 | **D7** | Differentiators | Probabilistic maps, ML surrogate, evacuation feasibility, cascade failure, satellite-triggered natural-dam watch. | Section 1 |
 
 ---
