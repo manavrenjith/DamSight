@@ -81,9 +81,7 @@ def main():
                 site=config,
             )
         except ValueError as e:
-            logger.error(
-                f"Cannot generate breach hydrograph for '{args.site}': {e}."
-            )
+            logger.error(f"Cannot generate breach hydrograph for '{args.site}': {e}.")
             return 1
 
         hb_val = dam_inputs["dam_height_m"]

@@ -162,9 +162,10 @@ class DamItemConfig(BaseModel):
         d_source = (self.source or "").upper()
         if "SYNTHETIC" in s_id and "SYNTHETIC" in s_name:
             return True
-        if "SYNTHETIC" in d_id and ("SYNTHETIC" in s_id or "SYNTHETIC" in s_name or "SYNTHETIC" in d_source):
-            return True
-        return False
+        return bool(
+            "SYNTHETIC" in d_id
+            and ("SYNTHETIC" in s_id or "SYNTHETIC" in s_name or "SYNTHETIC" in d_source)
+        )
 
     def consume_physical_parameter(
         self,
@@ -187,17 +188,18 @@ class DamItemConfig(BaseModel):
                 "Values marked TODO_VERIFY always raise and cannot be consumed, even with allow_unverified=True."
             )
 
-        is_unverified = (
-            (field_name in self.unverified_parameters)
-            or (self.verified is False)
-        )
+        is_unverified = (field_name in self.unverified_parameters) or (self.verified is False)
         if is_unverified:
             if not allow_unverified:
                 raise ValueError(
                     f"Physical parameter '{field_name}' on dam '{self.id}' is unverified ({val}). "
                     "Must pass allow_unverified=True to consume unverified physical values."
                 )
-            src = self.parameter_sources.get(field_name) or self.parameter_sources.get("_dam") or self.source
+            src = (
+                self.parameter_sources.get(field_name)
+                or self.parameter_sources.get("_dam")
+                or self.source
+            )
             if not src or is_todo_value(src):
                 raise ValueError(
                     f"Physical parameter '{field_name}' on dam '{self.id}' is marked verified:false but has no valid source citation. "
@@ -383,7 +385,7 @@ class SiteConfig(BaseModel):
     ensemble: EnsembleConfig
     evacuation: EvacuationConfig
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, __context: Any, /) -> None:
         for dam in self.dams:
             dam._site_id = self.site_id
             dam._site_name = self.name

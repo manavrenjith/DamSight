@@ -139,17 +139,30 @@ def plot_hydrograph(
         )
 
     peak_idx = int(np.argmax(res.discharge_m3s))
-    ax1.scatter([time_hr[peak_idx]], [res.peak_discharge_hydrograph_m3s], color="#2ca02c", s=40, zorder=5)
+    ax1.scatter(
+        [time_hr[peak_idx]], [res.peak_discharge_hydrograph_m3s], color="#2ca02c", s=40, zorder=5
+    )
     ax1.annotate(
         f"Simulated Peak: {res.peak_discharge_hydrograph_m3s:.1f} m³/s\n"
         f"@ t = {time_hr[peak_idx]:.2f} hr\n"
         f"Ratio to Q_p(30m): {ratio_30:.2f}x",
         xy=(time_hr[peak_idx], res.peak_discharge_hydrograph_m3s),
         xytext=(time_hr[peak_idx] + 0.35, res.peak_discharge_hydrograph_m3s * 0.92),
-        arrowprops={"facecolor": "#2ca02c", "edgecolor": "#1b611b", "shrink": 0.05, "width": 1.2, "headwidth": 6},
+        arrowprops={
+            "facecolor": "#2ca02c",
+            "edgecolor": "#1b611b",
+            "shrink": 0.05,
+            "width": 1.2,
+            "headwidth": 6,
+        },
         fontsize=8.5,
         fontweight="bold",
-        bbox={"boxstyle": "round,pad=0.35", "facecolor": "#f0fff0", "edgecolor": "#2ca02c", "alpha": 0.95},
+        bbox={
+            "boxstyle": "round,pad=0.35",
+            "facecolor": "#f0fff0",
+            "edgecolor": "#2ca02c",
+            "alpha": 0.95,
+        },
     )
     ax1.set_ylabel("Discharge (m³/s)", fontsize=11)
     ax1.set_title(

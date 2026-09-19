@@ -28,6 +28,7 @@ tools/
 *.dbf
 *.prj
 *.kml
+*.sww
 
 # Credentials, Keys, and Environment Files
 .env
