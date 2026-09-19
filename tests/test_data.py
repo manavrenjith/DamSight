@@ -1,17 +1,17 @@
 """Tests for data ingestion, grid alignment, terrain conditioning, and offline behaviour."""
 
 import json
-from pathlib import Path
+
 import numpy as np
 import pytest
 import rasterio
 
-from damsight.config import SiteConfig, load_site_config
+from damsight.config import SiteConfig
 from damsight.data.dem import (
     compute_void_cell_pct,
     fill_depressions_priority_flood,
 )
-from damsight.data.ingest import MissingDatasetError, generate_synthetic_raw_data, run_ingestion
+from damsight.data.ingest import MissingDatasetError, run_ingestion
 from damsight.data.landcover import load_manning_lookup
 
 
@@ -86,10 +86,10 @@ def test_priority_flood_depression_filling():
     dem = np.array(
         [
             [10.0, 10.0, 10.0, 10.0, 10.0],
-            [10.0,  8.0,  8.0,  8.0, 10.0],
-            [10.0,  8.0,  4.0,  8.0, 10.0],  # Center cell is a pit (4.0m, surrounding is 8.0m)
-            [10.0,  8.0,  8.0,  8.0, 10.0],
-            [10.0, 10.0,  6.0, 10.0, 10.0],  # (4, 2) is lowest boundary outlet (6.0m)
+            [10.0, 8.0, 8.0, 8.0, 10.0],
+            [10.0, 8.0, 4.0, 8.0, 10.0],  # Center cell is a pit (4.0m, surrounding is 8.0m)
+            [10.0, 8.0, 8.0, 8.0, 10.0],
+            [10.0, 10.0, 6.0, 10.0, 10.0],  # (4, 2) is lowest boundary outlet (6.0m)
         ],
         dtype=np.float32,
     )
@@ -141,7 +141,7 @@ def test_offline_missing_dataset_raises_error(synthetic_site_config, tmp_path):
 def test_ingestion_grid_alignment_and_report(synthetic_site_config, tmp_path):
     """Test full ingestion pipeline with synthetic data, checking raster alignment and report.json."""
     cache_root = tmp_path / "cache"
-    report = run_ingestion(
+    _report = run_ingestion(
         site=synthetic_site_config,
         cache_root=cache_root,
         allow_synthetic_fallback=True,
@@ -161,10 +161,12 @@ def test_ingestion_grid_alignment_and_report(synthetic_site_config, tmp_path):
     assert report_path.exists()
 
     # Verify identical raster geometry and CRS
-    with rasterio.open(dem_path) as dem_src, \
-         rasterio.open(lc_path) as lc_src, \
-         rasterio.open(manning_path) as man_src, \
-         rasterio.open(pop_path) as pop_src:
+    with (
+        rasterio.open(dem_path) as dem_src,
+        rasterio.open(lc_path) as lc_src,
+        rasterio.open(manning_path) as man_src,
+        rasterio.open(pop_path) as pop_src,
+    ):
 
         # Check CRS
         assert dem_src.crs.to_string() == synthetic_site_config.crs
@@ -199,3 +201,69 @@ def test_ingestion_grid_alignment_and_report(synthetic_site_config, tmp_path):
     assert rep["terrain_conditioning"]["cells_modified"] >= 0
     assert "manning_stats" in rep
     assert "datasets_status" in rep
+
+
+def test_population_zeros_preserved_and_exact_void_count(tmp_path):
+    """Test that source raster carrying its own nodata (-99999.0) plus valid zeros (0.0) is correctly reprojected:
+    voids (-99999.0) -> dst_nodata (-9999.0), valid zeros (0.0) preserved without corruption.
+
+    On m2-candidate exposure.py (dst_nodata=0.0, no src_nodata), voids were turned into 0.0,
+    causing assert np.sum(aligned == -9999.0) == 20 to fail by assertion (got 0 != 20).
+    """
+    from damsight.data.exposure import ingest_population
+
+    raw_pop_path = tmp_path / "raw_pop.tif"
+    out_pop_path = tmp_path / "aligned_pop.tif"
+
+    # 10x10 raster: 50 populated cells (10.0), 30 valid zeros (0.0), 20 real voids (-99999.0)
+    data = np.full((10, 10), 10.0, dtype=np.float32)
+    data[0:3, :] = 0.0  # 30 cells of valid zero population
+    data[8:10, :] = -99999.0  # 20 cells of real voids in source
+
+    transform = rasterio.transform.from_origin(600000.0, 2501800.0, 30.0, 30.0)
+    raw_profile = {
+        "driver": "GTiff",
+        "count": 1,
+        "dtype": "float32",
+        "width": 10,
+        "height": 10,
+        "crs": "EPSG:32643",
+        "transform": transform,
+        "nodata": -99999.0,  # Source raster carries -99999.0 nodata
+    }
+    with rasterio.open(raw_pop_path, "w", **raw_profile) as dst:
+        dst.write(data, 1)
+
+    dem_profile = {
+        "driver": "GTiff",
+        "count": 1,
+        "dtype": "float32",
+        "width": 10,
+        "height": 10,
+        "crs": "EPSG:32643",
+        "transform": transform,
+        "nodata": -9999.0,  # Destination DEM grid carries -9999.0 nodata
+    }
+
+    aligned, stats = ingest_population(
+        raw_pop_path=raw_pop_path,
+        out_pop_path=out_pop_path,
+        dem_profile=dem_profile,
+        nodata=-9999.0,
+    )
+
+    # Check valid zeros preserved
+    valid_zero_count = int(np.sum(aligned == 0.0))
+    assert valid_zero_count == 30, f"Expected 30 valid zeros preserved, got {valid_zero_count}"
+
+    # Check source voids (-99999.0) mapped to destination nodata (-9999.0)
+    void_count = int(np.sum(aligned == -9999.0))
+    assert void_count == 20, f"Expected 20 real voids (-9999.0), got {void_count}"
+    assert stats["void_cells"] == 20
+
+    # Check void percentage is 20.0%
+    void_pct = (void_count / aligned.size) * 100.0
+    assert void_pct == 20.0
+
+    # Verify no GDAL 1.4013e-45 corruption
+    assert not np.any((aligned > 0.0) & (aligned < 1e-30))

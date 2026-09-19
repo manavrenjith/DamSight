@@ -6,7 +6,7 @@ import heapq
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import rasterio
@@ -37,15 +37,15 @@ class TerrainConditioningResult:
     mean_fill_m: float
     total_volume_m3: float
     carving_applied: bool
-    changes: List[TerrainChangeLog] = field(default_factory=list)
+    changes: list[TerrainChangeLog] = field(default_factory=list)
 
 
 def fill_depressions_priority_flood(
     dem: np.ndarray,
-    cell_size_m: float = 30.0,
-    max_fill_depth: float = 15.0,
+    cell_size_m: float,
+    max_fill_depth: float,
     nodata: float = -9999.0,
-) -> Tuple[np.ndarray, TerrainConditioningResult]:
+) -> tuple[np.ndarray, TerrainConditioningResult]:
     """Fill depressions in DEM using the Wang & Liu (2006) Priority-Flood algorithm.
 
     Guarantees monotonic drainage toward domain boundaries while preserving
@@ -54,7 +54,7 @@ def fill_depressions_priority_flood(
     rows, cols = dem.shape
     filled = dem.copy()
     visited = np.zeros((rows, cols), dtype=bool)
-    pq: List[Tuple[float, int, int]] = []
+    pq: list[tuple[float, int, int]] = []
 
     # Initialize priority queue with boundary cells (excluding nodata)
     for r in range(rows):
@@ -69,7 +69,7 @@ def fill_depressions_priority_flood(
                 heapq.heappush(pq, (float(filled[r, c]), r, c))
                 visited[r, c] = True
 
-    changes: List[TerrainChangeLog] = []
+    changes: list[TerrainChangeLog] = []
 
     # 8-connectivity offsets
     neighbors = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
@@ -137,11 +137,11 @@ def condition_and_save_dem(
     raw_dem_path: Path,
     out_dem_path: Path,
     target_crs: str,
-    resolution_m: float = 30.0,
-    bbox: Optional[Tuple[float, float, float, float]] = None,
-    max_fill_depth: float = 15.0,
+    resolution_m: float,
+    max_fill_depth: float,
+    bbox: tuple[float, float, float, float] | None = None,
     nodata: float = -9999.0,
-) -> Tuple[np.ndarray, rasterio.Affine, TerrainConditioningResult, Dict[str, Any]]:
+) -> tuple[np.ndarray, rasterio.Affine, TerrainConditioningResult, dict[str, Any]]:
     """Load DEM, reproject/resample to site grid, condition terrain sinks, and save."""
     out_dem_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -150,8 +150,8 @@ def condition_and_save_dem(
         if bbox is not None and not any(isinstance(x, str) for x in bbox):
             # Projected bounds specified
             minx, miny, maxx, maxy = bbox
-            width = max(1, int(round((maxx - minx) / resolution_m)))
-            height = max(1, int(round((maxy - miny) / resolution_m)))
+            width = max(1, round((maxx - minx) / resolution_m))
+            height = max(1, round((maxy - miny) / resolution_m))
             dst_transform = from_bounds(minx, miny, maxx, maxy, width, height)
         else:
             transform, width, height = calculate_default_transform(
@@ -160,6 +160,7 @@ def condition_and_save_dem(
             dst_transform = transform
 
         dst_array = np.full((height, width), nodata, dtype=np.float32)
+        src_nodata = src.nodata if src.nodata is not None else nodata
 
         reproject(
             source=rasterio.band(src, 1),
@@ -169,6 +170,7 @@ def condition_and_save_dem(
             dst_transform=dst_transform,
             dst_crs=target_crs,
             resampling=Resampling.bilinear,
+            src_nodata=src_nodata,
             dst_nodata=nodata,
         )
 
@@ -201,9 +203,15 @@ def condition_and_save_dem(
 
     valid_mask = (conditioned != nodata) & (~np.isnan(conditioned))
     stats = {
-        "min_elevation_m": round(float(np.min(conditioned[valid_mask])), 2) if np.any(valid_mask) else 0.0,
-        "max_elevation_m": round(float(np.max(conditioned[valid_mask])), 2) if np.any(valid_mask) else 0.0,
-        "mean_elevation_m": round(float(np.mean(conditioned[valid_mask])), 2) if np.any(valid_mask) else 0.0,
+        "min_elevation_m": (
+            round(float(np.min(conditioned[valid_mask])), 2) if np.any(valid_mask) else 0.0
+        ),
+        "max_elevation_m": (
+            round(float(np.max(conditioned[valid_mask])), 2) if np.any(valid_mask) else 0.0
+        ),
+        "mean_elevation_m": (
+            round(float(np.mean(conditioned[valid_mask])), 2) if np.any(valid_mask) else 0.0
+        ),
         "void_cell_pct": void_pct,
     }
 

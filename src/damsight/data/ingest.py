@@ -6,7 +6,7 @@ import json
 import logging
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import geopandas as gpd
 import numpy as np
@@ -25,13 +25,11 @@ logger = logging.getLogger(__name__)
 class MissingDatasetError(FileNotFoundError):
     """Raised when an input dataset is missing and cannot be downloaded offline."""
 
-    pass
 
-
-def generate_synthetic_raw_data(raw_dir: Path, target_crs: str = "EPSG:32643") -> Dict[str, Path]:
+def generate_synthetic_raw_data(raw_dir: Path, target_crs: str = "EPSG:32643") -> dict[str, Path]:
     """Generate tiny synthetic raw datasets for offline testing and demonstration."""
     raw_dir.mkdir(parents=True, exist_ok=True)
-    paths: Dict[str, Path] = {}
+    paths: dict[str, Path] = {}
 
     # 1. Synthetic DEM (60x60 grid with slope and a small depression)
     dem_path = raw_dir / "raw_dem.tif"
@@ -70,10 +68,10 @@ def generate_synthetic_raw_data(raw_dir: Path, target_crs: str = "EPSG:32643") -
     lc_path = raw_dir / "raw_worldcover.tif"
     lc_data = np.full((height, width), 40, dtype=np.uint8)  # default cropland
     lc_data[10:20, 10:20] = 50  # urban settlement
-    lc_data[28:32, :] = 80      # river channel
+    lc_data[28:32, :] = 80  # river channel
     lc_data[40:55, 40:55] = 30  # grassland
     lc_profile = profile.copy()
-    lc_profile.update({"dtype": "uint8", "nodata": 0})
+    lc_profile.update({"dtype": "uint8", "nodata": 255})
     with rasterio.open(lc_path, "w", **lc_profile) as dst:
         dst.write(lc_data, 1)
     paths["landcover"] = lc_path
@@ -109,12 +107,14 @@ def generate_synthetic_raw_data(raw_dir: Path, target_crs: str = "EPSG:32643") -
     # 5. Synthetic OSM Buildings
     buildings_path = raw_dir / "raw_buildings.geojson"
     b_geoms = [
-        Polygon([
-            (x0 + 350, y0 + 350),
-            (x0 + 400, y0 + 350),
-            (x0 + 400, y0 + 400),
-            (x0 + 350, y0 + 400),
-        ]),
+        Polygon(
+            [
+                (x0 + 350, y0 + 350),
+                (x0 + 400, y0 + 350),
+                (x0 + 400, y0 + 400),
+                (x0 + 350, y0 + 400),
+            ]
+        ),
     ]
     buildings_gdf = gpd.GeoDataFrame(
         {
@@ -152,10 +152,10 @@ def generate_synthetic_raw_data(raw_dir: Path, target_crs: str = "EPSG:32643") -
 
 def run_ingestion(
     site: SiteConfig | Path | str,
-    cache_root: Optional[Path] = None,
+    cache_root: Path | None = None,
     allow_synthetic_fallback: bool = False,
-    lookup_csv_path: Optional[Path] = None,
-) -> Dict[str, Any]:
+    lookup_csv_path: Path | None = None,
+) -> dict[str, Any]:
     """Execute complete ingestion pipeline for a site.
 
     Produces aligned rasters, vector layers, and report.json.
@@ -169,7 +169,9 @@ def run_ingestion(
     if is_todo_value(config.crs):
         if allow_synthetic_fallback:
             target_crs = "EPSG:32643"  # UTM 43N demo reach default
-            logger.warning(f"Site CRS is unverified ('{config.crs}'). Using fallback CRS '{target_crs}'.")
+            logger.warning(
+                f"Site CRS is unverified ('{config.crs}'). Using fallback CRS '{target_crs}'."
+            )
         else:
             raise MissingDatasetError(
                 f"Site CRS is unverified ('{config.crs}'). Please specify a valid projected CRS in site config."
@@ -185,7 +187,9 @@ def run_ingestion(
     raw_dir = site_cache / "raw"
 
     # Determine input sources or check offline availability
-    dem_raw_path = Path(config.inputs.dem.path) if config.inputs.dem.path else raw_dir / "raw_dem.tif"
+    dem_raw_path = (
+        Path(config.inputs.dem.path) if config.inputs.dem.path else raw_dir / "raw_dem.tif"
+    )
     lc_raw_path = raw_dir / "raw_worldcover.tif"
     pop_raw_path = raw_dir / "raw_population.tif"
     roads_raw_path = raw_dir / "raw_roads.geojson"
@@ -212,11 +216,12 @@ def run_ingestion(
 
     # 1. Condition DEM and establish master grid profile
     out_dem = site_cache / "dem.tif"
-    dem_arr, dem_transform, cond_result, elev_stats = condition_and_save_dem(
+    _dem_arr, _dem_transform, cond_result, elev_stats = condition_and_save_dem(
         raw_dem_path=dem_raw_path,
         out_dem_path=out_dem,
         target_crs=target_crs,
         resolution_m=res_m,
+        max_fill_depth=15.0,
     )
 
     with rasterio.open(out_dem) as src:
@@ -235,11 +240,12 @@ def run_ingestion(
                 f"Please place landcover GeoTIFF at: '{lc_raw_path}'."
             )
 
-    lc_arr, manning_arr, manning_stats = generate_landcover_and_manning(
+    _lc_arr, _manning_arr, manning_stats = generate_landcover_and_manning(
         raw_lc_path=lc_raw_path,
         out_lc_path=out_lc,
         out_manning_path=out_manning,
         dem_profile=master_profile,
+        default_manning=0.040,
         lookup_csv_path=lookup_csv_path,
     )
 
@@ -259,14 +265,24 @@ def run_ingestion(
     out_buildings = site_cache / "buildings.geojson"
     out_places = site_cache / "places.geojson"
 
-    roads_stat = ingest_vector_exposure(roads_raw_path if roads_raw_path.exists() else None, out_roads, target_crs)
-    buildings_stat = ingest_vector_exposure(buildings_raw_path if buildings_raw_path.exists() else None, out_buildings, target_crs)
-    places_stat = ingest_vector_exposure(places_raw_path if places_raw_path.exists() else None, out_places, target_crs)
+    roads_stat = ingest_vector_exposure(
+        roads_raw_path if roads_raw_path.exists() else None, out_roads, target_crs
+    )
+    buildings_stat = ingest_vector_exposure(
+        buildings_raw_path if buildings_raw_path.exists() else None, out_buildings, target_crs
+    )
+    places_stat = ingest_vector_exposure(
+        places_raw_path if places_raw_path.exists() else None, out_places, target_crs
+    )
 
     # 5. Compile report.json
-    report: Dict[str, Any] = {
+    report: dict[str, Any] = {
         "site_id": site_id,
-        "data_status": "unverified" if (not config.is_fully_verified or allow_synthetic_fallback) else config.data_status.dam_parameters,
+        "data_status": (
+            "unverified"
+            if (not config.is_fully_verified or allow_synthetic_fallback)
+            else config.data_status.dam_parameters
+        ),
         "crs": target_crs,
         "resolution_m": res_m,
         "grid_shape": [int(master_profile["height"]), int(master_profile["width"])],
@@ -290,9 +306,20 @@ def run_ingestion(
         },
         "datasets_status": {
             "dem": {"status": "ingested", "source": config.inputs.dem.source, "file": str(out_dem)},
-            "landcover": {"status": "ingested", "source": config.inputs.landcover, "file": str(out_lc)},
-            "manning_n": {"status": "derived", "source": "manning_lookup.csv", "file": str(out_manning)},
-            "population": {"status": "ingested" if pop_raw_path.exists() else "empty", "file": str(out_pop)},
+            "landcover": {
+                "status": "ingested",
+                "source": config.inputs.landcover,
+                "file": str(out_lc),
+            },
+            "manning_n": {
+                "status": "derived",
+                "source": "manning_lookup.csv",
+                "file": str(out_manning),
+            },
+            "population": {
+                "status": "ingested" if pop_raw_path.exists() else "empty",
+                "file": str(out_pop),
+            },
             "roads": {"status": "ingested", "file": str(out_roads)},
             "buildings": {"status": "ingested", "file": str(out_buildings)},
             "places": {"status": "ingested", "file": str(out_places)},
