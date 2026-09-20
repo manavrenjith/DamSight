@@ -110,12 +110,20 @@ def run_benchmark_suite(
                 "h_left_m": b_cfg["h_left_m"],
                 "h_right_m": h_right,
                 "manning_n": 0.0,
+                "b_left": "transmissive",
+                "b_right": "transmissive",
+                "boundary_type": "transmissive",
                 "duration_s": 16.0,
                 "yieldstep_s": 1.0,
             }
 
             # 1. Prepare through adapter
-            run_dir = solver.prepare(spec, mesh_resolution_m=res_m, run_dir=run_tmp)
+            run_dir = solver.prepare(
+                spec,
+                mesh_resolution_m=res_m,
+                boundary_type="transmissive",
+                run_dir=run_tmp,
+            )
 
             # 2. Run through adapter
             run_res = solver.run(run_dir, yieldstep=1.0, finaltime=16.0)
@@ -161,7 +169,7 @@ def run_benchmark_suite(
                 err_front_m = float(abs(x_sim_front - x_exact_thresh))
                 err_front_pos_pct = float((err_front_m / x_exact_thresh) * 100.0)
 
-                # (ii) % of distance travelled from x0 [information only]
+                # (ii) % of distance travelled from x0 [strict metric, reported in JSON & PERFORMANCE.md]
                 dist_travelled = abs(x_exact_thresh - x0)
                 err_dist_travelled_pct = float(
                     (err_front_m / dist_travelled) * 100.0 if dist_travelled > 0 else 0.0
@@ -170,23 +178,29 @@ def run_benchmark_suite(
                 # Error against analytical tip (depth = 0) [information only]
                 err_against_tip_m = float(abs(x_sim_front - exact_front_tip))
 
-                # B6: L1 depth error definition:
-                # Region: Disturbed zone where |x - x0| <= c0 * t (length L_disturbed = 2 * c0 * t).
-                # Normalisation: Normalised by (h0 * L_disturbed), representing the mean fractional depth error over the wave region:
-                #   L1_norm = integral_{|x-x0|<=c0*t} |h_sim(x) - h_exact(x)| dx / (h0 * L_disturbed)
-                #           = mean_{|x-x0|<=c0*t} |h_sim - h_exact| / h0.
-                # Gate: L1 / (h0 * L_disturbed) <= 5.0% at all evaluation times.
+                # L1 Region 1 (Symmetric): Disturbed zone where |x - x0| <= c0 * t
                 mask_disturbed = np.abs(xc_sim - x0) <= (c0 * t_eval)
                 l1_disturbed_m = float(np.mean(np.abs(h_sim[mask_disturbed] - h_exact[mask_disturbed])))
                 l1_disturbed_norm_pct = float((l1_disturbed_m / h0) * 100.0)
+
+                # L1 Region 2: True disturbed region including tip
+                # For Ritter: [x0 - c0*t, x0 + 2*c0*t]
+                # For Stoker: [x0 - c0*t, x_exact_thresh]
+                if b_key == "ritter":
+                    mask_true_disturbed = (xc_sim >= (x0 - c0 * t_eval)) & (xc_sim <= (x0 + 2.0 * c0 * t_eval))
+                else:
+                    mask_true_disturbed = (xc_sim >= (x0 - c0 * t_eval)) & (xc_sim <= x_exact_thresh)
+                l1_true_disturbed_m = float(np.mean(np.abs(h_sim[mask_true_disturbed] - h_exact[mask_true_disturbed])))
+                l1_true_disturbed_norm_pct = float((l1_true_disturbed_m / h0) * 100.0)
 
                 # Whole-domain L1 norm [information only]: mean_{domain} |h_sim - h_exact| / h0
                 l1_whole_m = float(np.mean(np.abs(h_sim - h_exact)))
                 l1_whole_norm_pct = float((l1_whole_m / h0) * 100.0)
 
-                # Gate evaluations
+                # Gate evaluations (at dx=5m)
                 gate_front_pass = err_front_pos_pct <= 5.0
                 gate_l1_pass = l1_disturbed_norm_pct <= 5.0
+                gate_l1_true_pass = l1_true_disturbed_norm_pct <= 5.0
 
                 res_data["times"][str(t_eval)] = {
                     "sim_front_m": round(x_sim_front, 2),
@@ -199,6 +213,9 @@ def run_benchmark_suite(
                     "gate_front_5pct_pass": gate_front_pass,
                     "l1_disturbed_m": round(l1_disturbed_m, 4),
                     "l1_disturbed_norm_pct": round(l1_disturbed_norm_pct, 2),
+                    "l1_true_disturbed_m": round(l1_true_disturbed_m, 4),
+                    "l1_true_disturbed_norm_pct": round(l1_true_disturbed_norm_pct, 2),
+                    "gate_l1_true_5pct_pass": gate_l1_true_pass,
                     "l1_whole_domain_m": round(l1_whole_m, 4),
                     "l1_whole_domain_norm_pct": round(l1_whole_norm_pct, 2),
                     "gate_l1_5pct_pass": gate_l1_pass,
@@ -243,6 +260,7 @@ def run_benchmark_suite(
                         ax.legend(loc="upper right", fontsize=7)
 
             b_results["resolutions"][f"{int(res_m)}m"] = res_data
+            shutil.rmtree(run_tmp, ignore_errors=True)
 
         # B5: Convergence audit between resolutions:
         # dx=10m vs dx=20m: error(10) <= error(20)
@@ -301,10 +319,12 @@ def main() -> None:
             for t, t_val in r_val["times"].items():
                 status_front = "PASS" if t_val["gate_front_5pct_pass"] else "FAIL"
                 status_l1 = "PASS" if t_val["gate_l1_5pct_pass"] else "FAIL"
+                status_l1_true = "PASS" if t_val["gate_l1_true_5pct_pass"] else "FAIL"
                 print(
                     f"    t = {t}s -> Front Err: {t_val['front_error_m']:.2f} m "
                     f"({t_val['front_error_pct_pos']:.2f}% pos [{status_front}], {t_val['front_error_pct_dist']:.2f}% dist, vs tip: {t_val['front_error_vs_tip_m']:.2f} m) | "
-                    f"L1 Disturbed: {t_val['l1_disturbed_norm_pct']:.2f}% [{status_l1}] (whole: {t_val['l1_whole_domain_norm_pct']:.2f}%)"
+                    f"L1 Sym: {t_val['l1_disturbed_norm_pct']:.2f}% [{status_l1}] | "
+                    f"L1 True: {t_val['l1_true_disturbed_norm_pct']:.2f}% [{status_l1_true}] (whole: {t_val['l1_whole_domain_norm_pct']:.2f}%)"
                 )
         print("  Convergence Audit (B5 Gate):")
         for t, c_val in b_val["convergence_audit"].items():
