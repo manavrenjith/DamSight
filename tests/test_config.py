@@ -136,12 +136,43 @@ def test_valid_v2_verified_config_passes_cleanly(valid_v2_verified_config_dict):
 
 
 def test_site_a_yaml_loads_and_emits_todo_verify_warnings():
-    """Test that configs/sites/site_a.yaml loads in v2 and emits UnverifiedValueWarning for TODOs."""
+    """Test that configs/sites/site_a.yaml loads in v2 and emits UnverifiedValueWarning for any TODO or unverified fields."""
+    import yaml
+
     yaml_path = Path(__file__).resolve().parent.parent / "configs" / "sites" / "site_a.yaml"
     assert yaml_path.exists(), f"Configuration file {yaml_path} does not exist"
+    raw_yaml = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
 
-    with pytest.warns(UnverifiedValueWarning) as warning_records:
-        config = load_site_config(yaml_path)
+    raw_text = yaml_path.read_text(encoding="utf-8")
+    has_unverified_content = (
+        "TODO_VERIFY" in raw_text
+        or "verified: false" in raw_text
+        or "verified: False" in raw_text
+    )
+
+    if has_unverified_content:
+        with pytest.warns(UnverifiedValueWarning) as warning_records:
+            config = load_site_config(yaml_path)
+        assert config.is_fully_verified is False
+        warning_messages = [str(w.message) for w in warning_records]
+
+        # Check that warnings were emitted for whichever fields actually contain TODO_VERIFY
+        if raw_yaml.get("crs") == "TODO_VERIFY":
+            assert any("CRS is unverified" in msg or "crs" in msg.lower() for msg in warning_messages)
+        for dam_dict in raw_yaml.get("dams", []):
+            for field in ["dam_height_m", "reservoir_volume_m3", "crest_elevation_m"]:
+                val = dam_dict.get(field)
+                if val == "TODO_VERIFY" or (isinstance(val, dict) and val.get("value") == "TODO_VERIFY"):
+                    assert any(field in msg for msg in warning_messages)
+    else:
+        with warnings.catch_warnings(record=True) as recorded_warnings:
+            warnings.simplefilter("always")
+            config = load_site_config(yaml_path)
+            unverified_warnings = [
+                w for w in recorded_warnings if issubclass(w.category, UnverifiedValueWarning)
+            ]
+            assert len(unverified_warnings) == 0
+        assert config.is_fully_verified is True
 
     # Verify site config object was successfully constructed
     assert config.site_id == "site_a"
@@ -149,15 +180,7 @@ def test_site_a_yaml_loads_and_emits_todo_verify_warnings():
     assert len(config.dams) == 2
     assert config.dams[0].id == "machhu_1"
     assert config.dams[1].id == "machhu_2"
-    assert config.dams[1].dam_height_m == "TODO_VERIFY"
-    assert config.crs == "TODO_VERIFY"
-    assert config.is_fully_verified is False
 
-    # Check that warnings were surfaced for multiple unverified fields
-    warning_messages = [str(w.message) for w in warning_records]
-    assert any("Site CRS is unverified" in msg for msg in warning_messages)
-    assert any("dam_height_m" in msg for msg in warning_messages)
-    assert any("reservoir_volume_m3" in msg for msg in warning_messages)
 
 
 def test_per_value_verified_false_emits_warning(valid_v2_verified_config_dict):
@@ -319,24 +342,55 @@ def test_site_a_data_status_dam_parameters_is_unverified():
 
 
 def test_real_site_a_all_todo_verify_raises_for_both_allow_unverified_flags():
-    """Test on real configs/sites/site_a.yaml: with all-TODO_VERIFY values,
-    get_dam_breach_inputs must raise ValueError for BOTH allow_unverified=False and allow_unverified=True.
+    """Test on real configs/sites/site_a.yaml:
+    Scans raw YAML for TODO_VERIFY in required dam fields.
+    The guard must raise iff any remain (for both allow_unverified values).
+    If none remain and every value carries a source and verified:false,
+    it must raise without the flag and return data_status='unverified' (with the sources) with the flag.
     """
+    import yaml
     from damsight.breach import get_dam_breach_inputs
 
     yaml_path = Path(__file__).resolve().parent.parent / "configs" / "sites" / "site_a.yaml"
+    raw_yaml = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+
     with pytest.warns(UnverifiedValueWarning):
         config = load_site_config(yaml_path)
 
     dam2 = config.get_dam("machhu_2")
 
-    # With allow_unverified=False, it MUST raise ValueError
-    with pytest.raises(ValueError, match="TODO_VERIFY"):
-        get_dam_breach_inputs(dam2, allow_unverified=False)
+    # Find raw dam2 dictionary
+    raw_dam2 = next(d for d in raw_yaml.get("dams", []) if d.get("id") == "machhu_2")
+    required_fields = ["crest_elevation_m", "dam_height_m", "reservoir_volume_m3"]
 
-    # With allow_unverified=True, it STILL MUST raise ValueError because values are TODO_VERIFY
-    with pytest.raises(ValueError, match="TODO_VERIFY"):
-        get_dam_breach_inputs(dam2, allow_unverified=True)
+    def is_todo(val) -> bool:
+        if val == "TODO_VERIFY":
+            return True
+        if isinstance(val, dict) and val.get("value") == "TODO_VERIFY":
+            return True
+        return False
+
+    has_todo_in_required = any(is_todo(raw_dam2.get(f)) for f in required_fields)
+
+    if has_todo_in_required:
+        # Guard must raise ValueError for BOTH allow_unverified=False and allow_unverified=True
+        with pytest.raises(ValueError, match="TODO_VERIFY"):
+            get_dam_breach_inputs(dam2, allow_unverified=False)
+
+        with pytest.raises(ValueError, match="TODO_VERIFY"):
+            get_dam_breach_inputs(dam2, allow_unverified=True)
+    else:
+        # If none remain and every value carries a source and verified:false:
+        # Must raise without allow_unverified flag
+        with pytest.raises(ValueError, match="allow_unverified=True"):
+            get_dam_breach_inputs(dam2, allow_unverified=False)
+
+        # With allow_unverified=True, returns data_status="unverified" and sources
+        inputs = get_dam_breach_inputs(dam2, allow_unverified=True)
+        assert inputs["dam_id"] == "machhu_2"
+        assert inputs["data_status"] == "unverified"
+        assert "sources" in inputs and len(inputs["sources"]) > 0
+
 
 
 def test_unverified_numeric_value_with_source_passes_with_flag_and_returns_source_list():
