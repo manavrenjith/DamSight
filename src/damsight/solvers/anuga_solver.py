@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import rasterio
 from rasterio.transform import from_origin
+from rasterio.warp import transform as transform_coords
 from scipy.interpolate import griddata
 
 from damsight.solvers.base import Outputs, RunDir, RunResult
@@ -200,6 +201,11 @@ class AnugaSolver:
                 raise FileNotFoundError(f"DEM raster file not found for site: {dem_path}")
 
             with rasterio.open(dem_path) as dem_src:
+                if dem_src.crs and dem_src.crs.is_geographic:
+                    raise ValueError(
+                        f"DEM is in a geographic CRS ({dem_src.crs.to_string()}); "
+                        f"a projected CRS with metric units (e.g., UTM) is required."
+                    )
                 dem_bounds = dem_src.bounds
                 dem_crs = dem_src.crs.to_string() if dem_src.crs else "EPSG:32643"
                 dem_transform = dem_src.transform
@@ -233,15 +239,36 @@ class AnugaSolver:
             )
             domain.set_quantity("elevation", valid_elev, location="centroids")
 
-            # Friction: sample from Manning raster if available
+            # Friction: require Manning raster path
             manning_path = kwargs.get("manning_path")
-            if manning_path and Path(manning_path).exists():
-                with rasterio.open(manning_path) as man_src:
-                    sampled_manning = np.array([val[0] for val in man_src.sample(centroids)])
-                domain.set_quantity("friction", sampled_manning, location="centroids")
-            else:
-                default_n = float(kwargs.get("manning_n", 0.035))
-                domain.set_quantity("friction", default_n)
+            if manning_path is None:
+                if (
+                    hasattr(site, "inputs")
+                    and hasattr(site.inputs, "manning")
+                    and site.inputs.manning.path
+                ):
+                    manning_path = site.inputs.manning.path
+                elif isinstance(site, dict) and "manning_path" in site:
+                    manning_path = site["manning_path"]
+
+            if manning_path is None:
+                raise FileNotFoundError(
+                    "Manning raster path is required for raster-based solver prepare"
+                )
+
+            manning_p = Path(manning_path)
+            if not manning_p.exists():
+                raise FileNotFoundError(f"Manning raster file not found: {manning_p}")
+
+            with rasterio.open(manning_p) as man_src:
+                sampled_manning = np.array([val[0] for val in man_src.sample(centroids)])
+            man_nodata = man_src.nodata or -9999.0
+            valid_manning = np.where(
+                sampled_manning == man_nodata,
+                np.nanmean(sampled_manning[sampled_manning != man_nodata]),
+                sampled_manning,
+            )
+            domain.set_quantity("friction", valid_manning, location="centroids")
 
             # Stage: initial water depth (dry bed by default)
             init_depth = float(kwargs.get("initial_depth_m", 0.0))
@@ -255,8 +282,30 @@ class AnugaSolver:
                     dam_loc = site.dams[0].location
 
                 if dam_loc is not None:
-                    # dam_loc can be [lon, lat] or [x, y]
                     dam_x, dam_y = float(dam_loc[0]), float(dam_loc[1])
+                    # If coordinates given in geographic lon/lat, transform to DEM CRS
+                    if -180.0 <= dam_x <= 180.0 and -90.0 <= dam_y <= 90.0:
+                        xs, ys = transform_coords("EPSG:4326", dem_crs, [dam_x], [dam_y])
+                        dam_x, dam_y = xs[0], ys[0]
+
+                    # Guard: check if dam location is inside DEM bounds
+                    if not (
+                        dem_bounds.left <= dam_x <= dem_bounds.right
+                        and dem_bounds.bottom <= dam_y <= dem_bounds.top
+                    ):
+                        raise ValueError(
+                            f"Dam location ({dam_x}, {dam_y}) is outside DEM bounding box: "
+                            f"[{dem_bounds.left}, {dem_bounds.bottom}, {dem_bounds.right}, {dem_bounds.top}]"
+                        )
+
+                    # Guard: check if inlet cell falls on a nodata DEM cell
+                    with rasterio.open(dem_path) as dem_src:
+                        inlet_sample = list(dem_src.sample([(dam_x, dam_y)]))[0][0]
+                        if inlet_sample == dem_nodata or np.isnan(inlet_sample):
+                            raise ValueError(
+                                f"Dam inlet location ({dam_x}, {dam_y}) falls on a nodata DEM cell ({inlet_sample})"
+                            )
+
                     inlet_radius = float(kwargs.get("inlet_radius_m", mesh_resolution_m * 1.5))
                     region = anuga.Region(domain, center=[dam_x, dam_y], radius=inlet_radius)
 
@@ -293,6 +342,7 @@ class AnugaSolver:
                 "shape": dem_shape,
                 "nodata": dem_nodata,
                 "resolution": mesh_resolution_m,
+                "dem_path": str(dem_path),
             }
 
         # Save any tally scaling or arrival parameters in extra
@@ -483,12 +533,46 @@ class AnugaSolver:
         interp_hazard = griddata(
             points, max_hazard_vals, (grid_x, grid_y), method="linear", fill_value=0.0
         ).reshape(height, width)
-        interp_arrival = griddata(
-            points, arrival_time_vals, (grid_x, grid_y), method="nearest", fill_value=nodata_val
-        ).reshape(height, width)
+        # Interpolate arrival time on wetted triangles using linear interpolation to prevent nearest-neighbor tie-breaking jitter
+        wetted_tri_mask = arrival_time_vals > 0
+        if np.any(wetted_tri_mask) and np.sum(wetted_tri_mask) >= 3:
+            interp_arrival = griddata(
+                points[wetted_tri_mask],
+                arrival_time_vals[wetted_tri_mask],
+                (grid_x, grid_y),
+                method="linear",
+                fill_value=nodata_val,
+            ).reshape(height, width)
+            # For wetted cells near margin where linear yields NaN or nodata, fallback to nearest wetted
+            nan_or_nodata = (interp_arrival == nodata_val) | np.isnan(interp_arrival)
+            need_fill = (interp_depth > arrival_thresh) & nan_or_nodata
+            if np.any(need_fill):
+                interp_arrival_near = griddata(
+                    points[wetted_tri_mask],
+                    arrival_time_vals[wetted_tri_mask],
+                    (grid_x, grid_y),
+                    method="nearest",
+                    fill_value=nodata_val,
+                ).reshape(height, width)
+                interp_arrival[need_fill] = interp_arrival_near[need_fill]
+        else:
+            interp_arrival = griddata(
+                points, arrival_time_vals, (grid_x, grid_y), method="nearest", fill_value=nodata_val
+            ).reshape(height, width)
 
         # Clean unwetted cells in arrival time
         interp_arrival = np.where(interp_depth <= arrival_thresh, nodata_val, interp_arrival)
+
+        # Apply input DEM nodata mask if dem_path is present in grid_spec
+        dem_spec_path = grid_spec.get("dem_path")
+        if dem_spec_path and Path(dem_spec_path).exists():
+            with rasterio.open(dem_spec_path) as dsrc:
+                dem_grid = dsrc.read(1)
+                dem_mask = (dem_grid == nodata_val) | np.isnan(dem_grid)
+                interp_depth[dem_mask] = nodata_val
+                interp_velocity[dem_mask] = nodata_val
+                interp_arrival[dem_mask] = nodata_val
+                interp_hazard[dem_mask] = nodata_val
 
         # Write standard GeoTIFF contract rasters
         max_depth_tif = run_dir.path / "max_depth.tif"
