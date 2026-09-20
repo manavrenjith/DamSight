@@ -116,3 +116,6 @@ Manning's $n$ values are mapped from ESA WorldCover 10m classes using `data/mann
 - **Interpretation of Peak Time ($t_{\text{peak}}$):**
   - The simulated peak outflow time ($t_{\text{peak}}$) is an emergent mathematical result of the competition between expanding breach cross-section and declining reservoir water head ($\frac{dh}{dt}$).
   - **Operational Warning:** The peak time $t_{\text{peak}}$ must **never** be interpreted or communicated as an operational forecast or prediction of real-world breach culmination. In actual dam incidents, geotechnical piping collapse or structural mass wasting occurs dynamically and irregularly. Parametric peak timing is strictly a benchmark and comparative scenario metric.
+- **Hydrograph Truncation & Inflow Boundary Behavior:**
+  - When a breach hydrograph is truncated (e.g. at `cutoff_q_ratio = 0.001` where discharge decays below $0.1\%$ of peak $Q_{\text{peak}}$, or when drainable active storage is exhausted), hydrodynamic solver adapters (such as `AnugaSolver` with `Inlet_operator`) evaluate inflow discharge $Q(t)$ via interpolation clamped to zero: for any simulation timestamp $t > t_{\text{end}}$, inflow defaults strictly to $Q(t) = 0.0\text{ m}^3/\text{s}$.
+  - This prevents artificial prolonged draining or persistent spurious inflow into downstream reaches after active reservoir evacuation.

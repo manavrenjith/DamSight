@@ -503,6 +503,52 @@ def test_hydrograph_metadata_peak_ratio_outside_band_and_residual_fraction():
     assert res.truncated_at_Q_over_peak <= 0.01
 
 
+def test_adaptive_substepping_fires_residual_shrinks_and_zero_clamps():
+    """Verify that adaptive sub-stepping actually fires in the recession tail (Q < 0.1% of peak):
+    residual volume fraction shrinks, and zero clamp events occur.
+    """
+    v_w = 1.0e6
+    h_b = 20.0
+    crest_z = 85.0
+    cd_rect = 1.70
+    cd_tri = 1.35
+    dt_s = 5.0
+
+    params = estimate_breach_parameters(
+        reservoir_volume_m3=v_w,
+        breach_height_m=h_b,
+        water_depth_m=h_b,
+        mode="overtopping",
+    )
+
+    res = generate_breach_hydrograph(
+        params=params,
+        crest_elevation_m=crest_z,
+        cd_rect=cd_rect,
+        cd_tri=cd_tri,
+        dt_s=dt_s,
+        cutoff_q_ratio=0.001,  # Run to Q < 0.1% of peak
+    )
+
+    # 1. Assert adaptive sub-stepping actually fired
+    assert res.substep_trigger_count > 0, (
+        f"Expected adaptive sub-stepping to fire, but got {res.substep_trigger_count} triggers"
+    )
+
+    # 2. Assert zero clamp bindings throughout simulation
+    assert res.clamp_active_steps == 0, f"Expected 0 clamp events, got {res.clamp_active_steps}"
+    assert res.clamp_active_before_recession == 0
+
+    # 3. Assert residual volume fraction shrinks to negligible level (< 0.01%)
+    assert res.residual_volume_fraction < 1e-4, (
+        f"Expected residual volume fraction < 1e-4, got {res.residual_volume_fraction}"
+    )
+
+    # 4. Truncation ratio is <= 0.001 of peak
+    assert res.truncated_at_Q_over_peak <= 0.001
+
+
+
 
 
 
