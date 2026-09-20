@@ -443,10 +443,65 @@ def test_hydrograph_file_exports(tmp_path):
 
     assert "peak_hydrograph_m3s" in meta
     assert "empirical_froehlich_qp_m3s" in meta
+    assert "peak_ratio_vs_froehlich" in meta
+    assert "outside_band" in meta
+    assert isinstance(meta["outside_band"], bool)
+    assert "residual_volume_fraction" in meta
+    assert "truncated_at_Q_over_peak" in meta
     assert meta["mass_conserved"] is True
     assert meta["drawdown_monotonic"] is True
     assert meta["parameter_status"] == "verified_formula"
     assert "clamp_active_before_recession" in meta
+
+    assert res.peak_ratio_vs_froehlich is not None
+    assert res.outside_band == (
+        res.peak_ratio_vs_froehlich < 0.5 or res.peak_ratio_vs_froehlich > 2.0
+    )
+    assert res.residual_volume_fraction == res.residual_storage_fraction
+    assert res.truncated_at_Q_over_peak >= 0.0
+
+
+def test_hydrograph_metadata_peak_ratio_outside_band_and_residual_fraction():
+    """Verify 0.4 hydrograph metadata: peak_ratio_vs_froehlich, outside_band (0.5-2.0 warning),
+    residual_volume_fraction, and truncated_at_Q_over_peak.
+    """
+    v_init = 2.5e7
+    h_b = 30.0
+    h_w = 27.5
+    crest_z = 85.0
+    cd_rect = 1.70
+    cd_tri = 1.35
+
+    params = estimate_breach_parameters(
+        reservoir_volume_m3=v_init,
+        breach_height_m=h_b,
+        water_depth_m=h_w,
+        mode="overtopping",
+    )
+    res = generate_breach_hydrograph(
+        params=params,
+        crest_elevation_m=crest_z,
+        cd_rect=cd_rect,
+        cd_tri=cd_tri,
+        dt_s=5.0,
+        cutoff_q_ratio=0.01,
+    )
+
+    # 1. peak_ratio_vs_froehlich
+    expected_ratio = res.peak_discharge_hydrograph_m3s / params.empirical_peak_qp_m3s
+    assert np.isclose(res.peak_ratio_vs_froehlich, expected_ratio, atol=1e-4)
+
+    # 2. outside_band: warning flag for ratio outside [0.5, 2.0]
+    # For 25 MCM, peak is ~10970 and Qp is ~5628, ratio ~1.95 in band [0.5, 2.0] -> outside_band is False
+    assert res.outside_band == (res.peak_ratio_vs_froehlich < 0.5 or res.peak_ratio_vs_froehlich > 2.0)
+    assert res.outside_band is False
+
+    # 3. residual_volume_fraction
+    assert 0.0 <= res.residual_volume_fraction <= 0.05
+
+    # 4. truncated_at_Q_over_peak
+    assert res.truncated_at_Q_over_peak <= 0.01
+
 
 
 
