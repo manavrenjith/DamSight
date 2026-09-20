@@ -66,3 +66,34 @@ The $h_{\text{water}}^{2.5}$ scaling strongly amplifies peak discharge for deep 
   - $Q_p = 0.607 \cdot V_w^{0.295} \cdot h_w^{1.24}$ has an empirical exponent of $1.24$ on water depth.
   - When $V_w \ge 2.5 \times 10^7\text{ m}^3$ and $h_w \ge 25\text{ m}$, the difference in depth scaling exponents ($h_w^{1.5} / h_w^{1.24} = h_w^{0.26} \approx 2.3$) between frictionless level-pool weir flow and Froehlich's regression fit naturally causes the simulated hydrograph peak to exceed Froehlich $Q_p$ by $1.95 - 2.26\times$.
 
+---
+
+## 4. Breach Geometry Clamping Mechanics & Side-Slope Parameters
+
+### A. Bottom-Width Clamp Example Using Froehlich (2008) Constants
+In `src/damsight/breach/froehlich.py`, the average breach width is computed using the Froehlich (2008) formulation:
+$$B_{\text{avg}} = 0.27 \cdot K_o \cdot V_w^{0.32} \cdot h_b^{0.04}$$
+where $K_o = 1.3$ for overtopping and $1.0$ for piping.
+
+The bottom width is geometrically constrained by:
+$$W_{\text{bottom}} = \max(0.0, B_{\text{avg}} - Z \cdot h_b)$$
+
+For a deep breach scenario with $V_w = 1.0 \times 10^6\text{ m}^3$, $h_b = 40.0\text{ m}$, and $K_o = 1.3$ (overtopping):
+$$B_{\text{avg}} = 0.27 \times 1.3 \times (1.0 \times 10^6)^{0.32} \times (40.0)^{0.04} \approx 33.82\text{ m}$$
+Because $B_{\text{avg}} - Z \cdot h_b = 33.82 - (1.0 \times 40.0) = -6.18\text{ m} \le 0$, $W_{\text{bottom}}$ clamps strictly to $0.0\text{ m}$.
+
+### B. Breach Widening Effect from Bottom Clamp ($40\text{ m}$ vs. $\approx 33.8\text{ m}$)
+When $W_{\text{bottom}}$ clamps to zero, the breach transitions into a pure triangular notch:
+- Bottom width: $W_{\text{bottom}} = 0.0\text{ m}$
+- Top width: $W_{\text{top}} = W_{\text{bottom}} + 2 Z h_b = 0.0 + 2(1.0)(40.0) = 80.0\text{ m}$
+- Resulting average width:
+  $$\bar{B} = \frac{W_{\text{bottom}} + W_{\text{top}}}{2} = \frac{0.0 + 80.0}{2} = 40.0\text{ m}$$
+
+Consequently, clamping $W_{\text{bottom}} \ge 0$ results in a physical breach opening whose average width ($40.0\text{ m}$) is **wider than the empirical $B_{\text{avg}}$** ($\approx 33.82\text{ m}$).
+
+### C. Verification Status of Side Slopes ($Z = 1.0 / 0.7$)
+- In Froehlich (2008), regression equations are derived specifically for $B_{\text{avg}}$ and $t_f$.
+- The side-slope ratios $Z = 1.0$ (overtopping) and $Z = 0.7$ (piping) are standard industry guidelines adapted from Froehlich (1995a, Table 1) and USACE practice, but are not regressed in Froehlich (2008).
+- **Status:** Marked **`unverified`** ("source not confirmed") in `ASSUMPTIONS.md` until cited against an exact paper table or equation.
+
+

@@ -21,18 +21,29 @@ This document tracks all physical constants, empirical coefficients, parameter r
 ## 1.1 Breach Geometry & Evolution Mechanics
 
 - **Side Slope ($Z$):**
-  - Mode `"overtopping"`: $Z = 1.0$ (1H:1V), standard Froehlich (2008) average side slope for overtopping failures.
-  - Mode `"piping"`: $Z = 0.7$ (0.7H:1V), steeper internal piping erosion channel per Froehlich (2008).
+  - Mode `"overtopping"`: $Z = 1.0$ (1H:1V).
+  - Mode `"piping"`: $Z = 0.7$ (0.7H:1V).
+  - *Verification Status:* **`unverified`** (source not confirmed). In Froehlich (2008), empirical regression equations are developed specifically for $B_{\text{avg}}$ and $t_f$; while side slope ratios of $1.0$ (overtopping) and $0.7$ (piping) are widely adopted in dam breach practice (adapted from Froehlich 1995a, Table 1 / USACE guidelines), no dedicated regression equation or lookup table for $Z$ appears in the 2008 paper text. Hence, $Z = 1.0 / 0.7$ has its provenance marked as "source not confirmed" and is labelled `unverified`.
 - **Initial Notch:**
   - At $t = 0$, $z_b(0) = z_{\text{crest}}$ and $w_b(0) = 0.0$ m. There is no pre-existing notch or pre-incision; water spills only when reservoir stage exceeds $z_{\text{crest}}$.
 - **Growth Law:**
   - For $t \in [0, t_f]$, linear enlargement:
     $$w_b(t) = W_{\text{bottom}} \cdot \frac{t}{t_f}, \quad z_b(t) = z_{\text{crest}} - h_b \cdot \frac{t}{t_f}$$
   - For $t > t_f$, terminal static geometry: $w_b(t) = W_{\text{bottom}}$, $z_b(t) = z_{\text{crest}} - h_b$.
-- **Bottom Width Rule ($W_{\text{bottom}}$):**
-  - Defined as $W_{\text{bottom}} = \max(0.0, B_{\text{avg}} - Z \cdot h_b)$.
-  - When $B_{\text{avg}} \le Z \cdot h_b$ (e.g. deep narrow breach with $V_w = 1\times 10^6\text{ m}^3$ and $h_b = 40\text{ m}$ where $B_{\text{avg}} \approx 33.82\text{ m} < 40\text{ m}$), $W_{\text{bottom}}$ clamps strictly to $0.0$ m.
-  - Under $W_{\text{bottom}} = 0.0$ m, the rectangular weir term vanishes ($1.70 \cdot 0 \cdot h^{1.5} = 0$), and routing transitions continuously and smoothly to pure triangular weir outflow ($Q = C_{d2} Z h^{2.5}$).
+- **Bottom Width Rule & Clamp ($W_{\text{bottom}}$):**
+  - Evaluated via Froehlich (2008) formulation:
+    $$B_{\text{avg}} = 0.27 \cdot K_o \cdot V_w^{0.32} \cdot h_b^{0.04}$$
+    where $K_o = 1.3$ for overtopping and $1.0$ for piping.
+  - Bottom width is geometrically defined as $W_{\text{bottom}} = \max(0.0, B_{\text{avg}} - Z \cdot h_b)$.
+  - **Example using 2008 constants ($0.27, K_o, h_b^{0.04}$):**
+    For a deep breach with $V_w = 1.0 \times 10^6\text{ m}^3$, $h_b = 40.0\text{ m}$, and $K_o = 1.3$ (overtopping):
+    $$B_{\text{avg}} = 0.27 \times 1.3 \times (1.0 \times 10^6)^{0.32} \times (40.0)^{0.04} = 0.351 \times 83.1764 \times 1.15836 \approx 33.82\text{ m}$$
+    Because $B_{\text{avg}} - Z \cdot h_b = 33.82 - (1.0 \times 40.0) = -6.18\text{ m} \le 0$, $W_{\text{bottom}}$ clamps strictly to $0.0\text{ m}$.
+  - **Geometric Consequence of Clamping:**
+    When $W_{\text{bottom}}$ is clamped to $0.0\text{ m}$, the breach geometry becomes a pure triangular notch with top width $W_{\text{top}} = W_{\text{bottom}} + 2 Z h_b = 0 + 2(1.0)(40.0) = 80.0\text{ m}$. The resulting actual average width of this triangular opening is:
+    $$\bar{B} = \frac{W_{\text{bottom}} + W_{\text{top}}}{2} = \frac{0.0 + 80.0}{2} = 40.0\text{ m}$$
+    Notice that the clamp $\max(0, B_{\text{avg}} - Z \cdot h_b)$ produces a final breach that is **wider than $B_{\text{avg}}$** ($40.0\text{ m}$ vs. $\approx 33.82\text{ m}$ from the regression).
+  - Under $W_{\text{bottom}} = 0.0$ m, the rectangular weir component vanishes ($1.70 \cdot 0 \cdot h^{1.5} = 0$), and routing transitions continuously and smoothly to pure triangular weir outflow ($Q = C_{d2} Z h^{2.5}$).
 
 
 ---
