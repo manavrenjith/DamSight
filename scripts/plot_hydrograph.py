@@ -13,7 +13,7 @@ from damsight.breach.hydrograph import StageStorageCurve, generate_breach_hydrog
 def plot_hydrograph(
     reservoir_volume_m3: float = 2.5e7,
     breach_height_m: float = 30.0,
-    water_depth_m: float = 30.0,
+    water_depth_m: float = 27.5,
     crest_elevation_m: float = 85.0,
     cd_rect: float = 1.70,
     cd_tri: float = 1.35,
@@ -62,7 +62,20 @@ def plot_hydrograph(
     final_stage = float(res.stage_m[-1])
     first_clamp = res.first_clamp_step
 
+    # Froehlich empirical Qp computations
+    # Qp = 0.607 * (V_w)^0.295 * (h_w)^1.24
+    # At V_w = 2.5e7, h_w = 27.5m: Qp = 0.607 * (2.5e7)^0.295 * (27.5)^1.24 = 5627.99 m3/s ~= 5628 m3/s
+    qp_hw = 0.607 * (reservoir_volume_m3**0.295) * (water_depth_m**1.24)
+    qp_hb = 0.607 * (reservoir_volume_m3**0.295) * (breach_height_m**1.24)
+    ratio_hw = res.peak_discharge_hydrograph_m3s / qp_hw if qp_hw > 0 else 0.0
+
     print("\n--- SYNTHETIC HYDROGRAPH SIMULATION REPORT ---")
+    print(
+        f"  Froehlich Q_p (h_w={water_depth_m:.1f} m):          {qp_hw:.1f} m³/s (rounded {qp_hw:.0f} m³/s)"
+    )
+    print(
+        f"  Simulated Peak Q_peak:                   {res.peak_discharge_hydrograph_m3s:.1f} m³/s (ratio={ratio_hw:.2f}x)"
+    )
     print(
         f"  Residual above-invert volume:            {residual_frac * 100.0:.3f}% ({residual_vol:.1f} / {active_vol:.1f} m³)"
     )
@@ -77,9 +90,6 @@ def plot_hydrograph(
     )
     print(
         f"  Total steps executed:                    {len(res.time_s)} (Final outflow Q = {res.discharge_m3s[-1]:.4f} m³/s)"
-    )
-    print(
-        f"  Peak outflow:                            {res.peak_discharge_hydrograph_m3s:.1f} m³/s"
     )
     print("----------------------------------------------\n")
 
@@ -116,26 +126,22 @@ def plot_hydrograph(
     ax1 = axes[0]
     ax1.plot(time_hr, res.discharge_m3s, color="#1f77b4", lw=2, label="Hydrograph Outflow Q(t)")
 
-    # Froehlich empirical Qp comparisons
-    qp_30 = 0.607 * (reservoir_volume_m3**0.295) * (breach_height_m**1.24)
-    qp_hw = 0.607 * (reservoir_volume_m3**0.295) * (water_depth_m**1.24)
-    ratio_30 = res.peak_discharge_hydrograph_m3s / qp_30 if qp_30 > 0 else 0.0
-
+    # Froehlich empirical Qp lines
     ax1.axhline(
-        qp_30,
+        qp_hw,
         color="#d62728",
         ls="--",
         lw=1.5,
-        label=f"Froehlich (1995) Q_p (h_w=30m: {qp_30:.0f} m³/s, ratio={ratio_30:.2f}x)",
+        label=f"Froehlich (1995) Q_p (h_w={water_depth_m:.1f}m: {qp_hw:.0f} m³/s, ratio={ratio_hw:.2f}x)",
     )
-    if abs(qp_hw - qp_30) > 10.0:
-        ratio_hw = res.peak_discharge_hydrograph_m3s / qp_hw if qp_hw > 0 else 0.0
+    if abs(qp_hb - qp_hw) > 10.0:
+        ratio_hb = res.peak_discharge_hydrograph_m3s / qp_hb if qp_hb > 0 else 0.0
         ax1.axhline(
-            qp_hw,
+            qp_hb,
             color="#9467bd",
             ls=":",
             lw=1.5,
-            label=f"Froehlich (1995) Q_p (h_w={water_depth_m:.1f}m: {qp_hw:.0f} m³/s, ratio={ratio_hw:.2f}x)",
+            label=f"Froehlich (1995) Q_p (h_b={breach_height_m:.1f}m: {qp_hb:.0f} m³/s, ratio={ratio_hb:.2f}x)",
         )
 
     peak_idx = int(np.argmax(res.discharge_m3s))
@@ -145,7 +151,7 @@ def plot_hydrograph(
     ax1.annotate(
         f"Simulated Peak: {res.peak_discharge_hydrograph_m3s:.1f} m³/s\n"
         f"@ t = {time_hr[peak_idx]:.2f} hr\n"
-        f"Ratio to Q_p(30m): {ratio_30:.2f}x",
+        f"Ratio to Q_p(h_w={water_depth_m:.1f}m: {qp_hw:.0f} m³/s): {ratio_hw:.2f}x",
         xy=(time_hr[peak_idx], res.peak_discharge_hydrograph_m3s),
         xytext=(time_hr[peak_idx] + 0.35, res.peak_discharge_hydrograph_m3s * 0.92),
         arrowprops={
@@ -228,7 +234,7 @@ def main():
     )
     parser.add_argument("--vw", type=float, default=2.5e7, help="Reservoir volume (m3)")
     parser.add_argument("--hb", type=float, default=30.0, help="Breach height (m)")
-    parser.add_argument("--hw", type=float, default=30.0, help="Water depth (m)")
+    parser.add_argument("--hw", type=float, default=27.5, help="Water depth (m)")
     parser.add_argument("--crest", type=float, default=85.0, help="Crest elevation (m)")
     args = parser.parse_args()
 
