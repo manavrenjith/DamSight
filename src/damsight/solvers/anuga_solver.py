@@ -136,6 +136,22 @@ class AnugaSolver:
             }
             domain.set_boundary(boundary_map)
 
+            # Inflow Hydrograph via Inlet Operator (for channel spec)
+            if hydrograph is not None and not hydrograph.empty:
+                dam_loc = kwargs.get("dam_location", [dam_x_m, width_m / 2.0])
+                dam_x, dam_y = float(dam_loc[0]), float(dam_loc[1])
+                inlet_radius = float(kwargs.get("inlet_radius_m", mesh_resolution_m * 1.5))
+                region = anuga.Region(domain, center=[dam_x, dam_y], radius=inlet_radius)
+
+                time_arr = hydrograph["time_s"].to_numpy()
+                flow_arr = hydrograph["discharge_m3s"].to_numpy()
+
+                def q_func_channel(t: float) -> float:
+                    return float(np.interp(t, time_arr, flow_arr, left=0.0, right=0.0))
+
+                inlet_op = anuga.Inlet_operator(domain, region, Q=q_func_channel)
+                extra["inlet_operator"] = inlet_op
+
             extra["domain"] = domain
             extra["channel_spec"] = {
                 "length_m": length_m,
@@ -264,6 +280,12 @@ class AnugaSolver:
                 "resolution": mesh_resolution_m,
             }
 
+        # Save any tally scaling or arrival parameters in extra
+        if "tally_inflow_scale" in kwargs:
+            extra["tally_inflow_scale"] = float(kwargs["tally_inflow_scale"])
+        if "arrival_threshold_m" in kwargs:
+            extra["arrival_threshold_m"] = float(kwargs["arrival_threshold_m"])
+
         return RunDir(path=run_dir_path, mesh_resolution_m=mesh_resolution_m, extra=extra)
 
     def run(
@@ -283,20 +305,49 @@ class AnugaSolver:
             finaltime = float(channel_spec.get("duration_s", 20.0))
 
         start_time = time.time()
-        initial_vol = float(domain.get_water_volume())
 
         # Evolve domain
         for _ in domain.evolve(yieldstep=yieldstep, finaltime=finaltime):
             pass
 
         runtime_s = time.time() - start_time
-        final_vol = float(domain.get_water_volume())
 
-        # Mass conservation accounting
+        # Compute domain volume INDEPENDENTLY from SWW output (stage - elevation, times cell area)
+        sww_path = run_dir.path / "simulation.sww"
+        if sww_path.exists():
+            nc = netCDF4.Dataset(str(sww_path), "r")
+            x_pts = np.array(nc.variables["x"][:])
+            y_pts = np.array(nc.variables["y"][:])
+            vols = np.array(nc.variables["volumes"][:])
+            stage_c = np.array(nc.variables["stage_c"][:])
+            elev_c = np.array(nc.variables["elevation_c"][:])
+            nc.close()
+
+            x0, y0 = x_pts[vols[:, 0]], y_pts[vols[:, 0]]
+            x1, y1 = x_pts[vols[:, 1]], y_pts[vols[:, 1]]
+            x2, y2 = x_pts[vols[:, 2]], y_pts[vols[:, 2]]
+            areas = 0.5 * np.abs(x0 * (y1 - y2) + x1 * (y2 - y0) + x2 * (y0 - y1))
+
+            initial_vol = float(np.sum(np.maximum(0.0, stage_c[0] - elev_c) * areas))
+            final_vol = float(np.sum(np.maximum(0.0, stage_c[-1] - elev_c) * areas))
+        else:
+            initial_vol = float(domain.get_water_volume())
+            final_vol = float(domain.get_water_volume())
+
+        # Mass conservation accounting: V_final = V_init + V_in - V_out
         inlet_op = run_dir.extra.get("inlet_operator")
         inflow_vol = float(inlet_op.get_total_applied_volume()) if inlet_op is not None else 0.0
 
-        expected_vol = initial_vol + inflow_vol
+        # Tally scale allows forced violation testing:
+        # e.g., inlet applied hydrograph scaled by 1.02 while tally uses 1.00
+        tally_scale = float(run_dir.extra.get("tally_inflow_scale", 1.0))
+        tally_inflow_vol = inflow_vol * tally_scale
+
+        # Boundary net flux (negative = outflow leaving domain, positive = inflow entering domain)
+        boundary_flux = float(domain.get_boundary_flux_integral())
+        outflow_vol = -min(0.0, boundary_flux)
+
+        expected_vol = initial_vol + tally_inflow_vol + boundary_flux
         norm_vol = max(1.0, max(expected_vol, final_vol))
         mass_balance_error = abs(final_vol - expected_vol) / norm_vol
 
@@ -308,7 +359,8 @@ class AnugaSolver:
             msg = (
                 f"Mass balance error ({mass_balance_error:.4%}) exceeded configured "
                 f"tolerance ({self.mass_balance_tolerance:.4%}). V_init={initial_vol:.1f} m3, "
-                f"V_inflow={inflow_vol:.1f} m3, V_final={final_vol:.1f} m3"
+                f"V_inflow={tally_inflow_vol:.1f} m3, V_outflow={outflow_vol:.1f} m3, "
+                f"V_final={final_vol:.1f} m3, V_expected={expected_vol:.1f} m3"
             )
             warnings_list.append(msg)
             logger.warning(msg)
@@ -321,6 +373,10 @@ class AnugaSolver:
             extra={
                 "initial_volume_m3": initial_vol,
                 "inflow_volume_m3": inflow_vol,
+                "tally_inflow_volume_m3": tally_inflow_vol,
+                "outflow_volume_m3": outflow_vol,
+                "boundary_flux_integral": boundary_flux,
+                "expected_volume_m3": expected_vol,
                 "final_volume_m3": final_vol,
                 "finaltime_s": finaltime,
             },
@@ -369,9 +425,10 @@ class AnugaSolver:
         max_velocity_vals = np.max(speed_c, axis=0)
         max_hazard_vals = np.max(hazard_c, axis=0)
 
-        # Arrival time: first time depth exceeds 0.1 m; nodata if never
+        # Arrival time: first time depth exceeds threshold; nodata if never
+        arrival_thresh = float(run_dir.extra.get("arrival_threshold_m", 0.1))
         arrival_time_vals = np.full(len(xc), -9999.0, dtype=np.float32)
-        exceed_mask = depth_c > 0.1  # (timesteps, n_triangles)
+        exceed_mask = depth_c > arrival_thresh  # (timesteps, n_triangles)
         for tri_idx in range(len(xc)):
             idx_hits = np.where(exceed_mask[:, tri_idx])[0]
             if len(idx_hits) > 0:
@@ -415,8 +472,8 @@ class AnugaSolver:
             points, arrival_time_vals, (grid_x, grid_y), method="nearest", fill_value=nodata_val
         ).reshape(height, width)
 
-        # Clean dry cells in arrival time
-        interp_arrival = np.where(interp_depth <= 0.05, nodata_val, interp_arrival)
+        # Clean unwetted cells in arrival time
+        interp_arrival = np.where(interp_depth <= arrival_thresh, nodata_val, interp_arrival)
 
         # Write standard GeoTIFF contract rasters
         max_depth_tif = run_dir.path / "max_depth.tif"
