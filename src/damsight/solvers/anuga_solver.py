@@ -68,12 +68,26 @@ class AnugaSolver:
         hydrograph: pd.DataFrame | None = None,
         mesh_resolution_m: float = 30.0,
         run_dir: Path | None = None,
+        boundary_type: str | None = None,
         **kwargs: Any,
     ) -> RunDir:
         """Prepare working directory, mesh, bathymetry, roughness, and boundary conditions.
 
         Supports both real/synthetic geospatial site configurations and analytical benchmark specifications.
+        boundary_type is a required parameter (no default).
         """
+        # Enforce required boundary_type with no default
+        resolved_b_type = boundary_type
+        if resolved_b_type is None and "boundary_type" in kwargs:
+            resolved_b_type = kwargs.pop("boundary_type")
+        if resolved_b_type is None and isinstance(site, dict) and "boundary_type" in site:
+            resolved_b_type = site.get("boundary_type")
+
+        if resolved_b_type is None:
+            raise ValueError(
+                "boundary_type is a required argument with no default (e.g. 'transmissive' or 'reflective')."
+            )
+
         if run_dir is None:
             import tempfile
 
@@ -85,6 +99,7 @@ class AnugaSolver:
         extra: dict[str, Any] = {
             "site": site,
             "hydrograph": hydrograph,
+            "boundary_type": resolved_b_type,
             "kwargs": kwargs,
         }
 
@@ -118,8 +133,8 @@ class AnugaSolver:
             domain.set_quantity("stage", initial_stage)
 
             # Boundary conditions: reflective side walls, transmissive ends
-            b_left = site.get("b_left", "transmissive")
-            b_right = site.get("b_right", "transmissive")
+            b_left = site.get("b_left", resolved_b_type)
+            b_right = site.get("b_right", resolved_b_type)
             boundary_map = {
                 "bottom": anuga.Reflective_boundary(domain),
                 "top": anuga.Reflective_boundary(domain),
@@ -255,7 +270,7 @@ class AnugaSolver:
                     extra["inlet_operator"] = inlet_op
 
             # Boundaries
-            b_type = kwargs.get("boundary_type", "transmissive")
+            b_type = resolved_b_type
             b_op = (
                 anuga.Transmissive_boundary(domain)
                 if b_type == "transmissive"
@@ -508,15 +523,19 @@ class AnugaSolver:
         warns = run_result.warnings if run_result else []
 
         run_meta_json = run_dir.path / "run_meta.json"
-        meta_data = {
+        meta_data: dict[str, Any] = {
             "solver": "anuga",
             "version": ANUGA_VERSION,
             "install_method": "conda-forge",
             "mesh_resolution_m": run_dir.mesh_resolution_m,
+            "boundary_type": run_dir.extra.get("boundary_type"),
             "runtime_s": runtime_s,
             "mass_balance_error": mass_error,
             "warnings": warns,
         }
+        if "arrival_threshold_m" in run_dir.extra:
+            meta_data["arrival_threshold_m"] = float(run_dir.extra["arrival_threshold_m"])
+
         with open(run_meta_json, "w", encoding="utf-8") as f:
             json.dump(meta_data, f, indent=2)
 
