@@ -116,6 +116,11 @@ class HydrographResult:
     clamp_active_steps: int = 0
     clamp_active_before_recession: int = 0
     first_clamp_step: int | None = None
+    substep_trigger_count: int = 0
+    peak_ratio_vs_froehlich: float | None = None
+    outside_band: bool = False
+    residual_volume_fraction: float = 0.0
+    truncated_at_Q_over_peak: float = 0.0
 
     def to_dataframe(self) -> pd.DataFrame:
         """Export time series to pandas DataFrame."""
@@ -155,6 +160,12 @@ class HydrographResult:
             },
             "peak_hydrograph_m3s": round(self.peak_discharge_hydrograph_m3s, 2),
             "empirical_froehlich_qp_m3s": round(self.empirical_peak_qp_m3s, 2),
+            "peak_ratio_vs_froehlich": (
+                round(self.peak_ratio_vs_froehlich, 4)
+                if self.peak_ratio_vs_froehlich is not None
+                else None
+            ),
+            "outside_band": self.outside_band,
             "time_to_peak_s": round(self.time_to_peak_s, 1),
             "time_to_peak_min": round(self.time_to_peak_s / 60.0, 2),
             "total_outflow_volume_m3": round(self.total_outflow_volume_m3, 1),
@@ -163,6 +174,8 @@ class HydrographResult:
             "remaining_reservoir_volume_m3": round(self.remaining_reservoir_volume_m3, 1),
             "residual_above_invert_volume_m3": round(residual_above_invert, 1),
             "residual_above_invert_fraction": round(residual_frac, 6),
+            "residual_volume_fraction": round(self.residual_volume_fraction, 6),
+            "truncated_at_Q_over_peak": round(self.truncated_at_Q_over_peak, 6),
             "mass_conserved": self.mass_conserved,
             "mass_balance_error_pct": round(self.mass_balance_error_pct, 4),
             "drawdown_monotonic": self.drawdown_monotonic,
@@ -171,10 +184,12 @@ class HydrographResult:
             "clamp_active_steps": self.clamp_active_steps,
             "clamp_active_before_recession": self.clamp_active_before_recession,
             "first_clamp_step": self.first_clamp_step,
+            "substep_trigger_count": self.substep_trigger_count,
         }
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
+
 
 
 def generate_breach_hydrograph(
@@ -231,6 +246,7 @@ def generate_breach_hydrograph(
     clamp_bind_count = 0
     clamp_before_recession = 0
     first_clamp_step: int | None = None
+    substep_trigger_count = 0
 
     step = 0
     peak_q = 0.0
@@ -263,6 +279,7 @@ def generate_breach_hydrograph(
 
             # Adaptive sub-stepping near the asymptotic recession tail to avoid discrete overshoot
             if needed_vol > 0.10 * available_vol and available_vol > 0.0:
+                substep_trigger_count += 1
                 n_sub = min(200, max(2, int(np.ceil(needed_vol / (0.05 * available_vol)))))
                 sub_dt = dt_s / n_sub
                 v_sub = curr_vol
@@ -326,12 +343,12 @@ def generate_breach_hydrograph(
             if step > 200000:
                 break
 
-    time_arr = np.array(time_list, dtype=np.float32)
-    q_arr = np.array(q_list, dtype=np.float32)
-    stage_arr = np.array(stage_list, dtype=np.float32)
-    vol_arr = np.array(vol_list, dtype=np.float32)
-    width_arr = np.array(width_list, dtype=np.float32)
-    invert_arr = np.array(invert_list, dtype=np.float32)
+    time_arr = np.array(time_list, dtype=float)
+    q_arr = np.array(q_list, dtype=float)
+    stage_arr = np.array(stage_list, dtype=float)
+    vol_arr = np.array(vol_list, dtype=float)
+    width_arr = np.array(width_list, dtype=float)
+    invert_arr = np.array(invert_list, dtype=float)
 
     peak_q = float(np.max(q_arr))
     time_to_peak = float(time_arr[np.argmax(q_arr)])
@@ -343,6 +360,17 @@ def generate_breach_hydrograph(
     stage_diffs = np.diff(stage_arr)
     drawdown_monotonic = bool(np.all(stage_diffs <= 1e-6))
     residual_storage_fraction = max(0.0, curr_vol - v_dead) / v_active if v_active > 0 else 0.0
+
+    peak_ratio = (
+        float(peak_q / params.empirical_peak_qp_m3s)
+        if params.empirical_peak_qp_m3s > 0
+        else None
+    )
+    outside_band = (
+        bool(peak_ratio < 0.5 or peak_ratio > 2.0) if peak_ratio is not None else False
+    )
+    residual_volume_fraction = residual_storage_fraction
+    truncated_q_ratio = float(q_arr[-1] / peak_q) if peak_q > 0 else 0.0
 
     return HydrographResult(
         time_s=time_arr,
@@ -366,7 +394,13 @@ def generate_breach_hydrograph(
         clamp_active_steps=clamp_bind_count,
         clamp_active_before_recession=clamp_before_recession,
         first_clamp_step=first_clamp_step,
+        substep_trigger_count=substep_trigger_count,
+        peak_ratio_vs_froehlich=peak_ratio,
+        outside_band=outside_band,
+        residual_volume_fraction=residual_volume_fraction,
+        truncated_at_Q_over_peak=truncated_q_ratio,
     )
+
 
 
 def get_dam_breach_inputs(

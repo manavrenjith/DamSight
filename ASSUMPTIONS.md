@@ -13,8 +13,27 @@ This document tracks all physical constants, empirical coefficients, parameter r
 | Froehlich (2008) Breach Width | $B_{\text{avg}} = 0.27 K_o V_w^{0.32} h_b^{0.04}$ | Froehlich, D. C. (2008). *Embankment dam breach parameters and their uncertainties*. Journal of Hydraulic Engineering, 134(12), 1708-1721. | Verified against published paper | SI units: $V_w$ in $\text{m}^3$, $h_b$ in $\text{m}$, $B_{\text{avg}}$ in $\text{m}$. (English units equivalent uses $0.1803$ with acre-ft and ft). $K_o = 1.3$ (overtopping), $1.0$ (piping). |
 | Froehlich (2008) Formation Time | $t_f = 63.2 \sqrt{\frac{V_w}{g h_b^2}}$ | Froehlich, D. C. (2008). *Embankment dam breach parameters and their uncertainties*. J. Hydraul. Eng. | Verified against published paper | SI units: $g = 9.80665 \text{ m/s}^2$, $t_f$ in seconds. $t_f(\text{hr}) = t_f / 3600$. (English units equivalent uses $g = 32.174\text{ ft/s}^2$, factor $0.0176$ hr). |
 | Froehlich (1995) Peak Outflow | $Q_p = 0.607 V_w^{0.295} h_w^{1.24}$ | Froehlich, D. C. (1995). *Peak outflow from breached embankment dam*. Journal of Water Resources Planning and Management, 121(1), 90-97. | Verified against published paper | SI units: $V_w$ in $\text{m}^3$, $h_w$ in $\text{m}$, $Q_p$ in $\text{m}^3/\text{s}$. (English units equivalent uses $23.4$ with $V_w$ in acre-ft, $h_w$ in ft). |
-| Broad-Crested Trapezoidal Weir | $Q = C_{d1} W_b h^{1.5} + C_{d2} Z h^{2.5}$ | Standard Open-Channel Hydraulics (Henderson, 1966; Chow, 1959) | Standard hydraulic formulation | $C_{d1} = 1.70 \text{ m}^{1/2}/\text{s}$ (rectangular weir), $C_{d2} = 1.35 \text{ m}^{1/2}/\text{s}$ (triangular side weir, $Z$ horizontal to 1 vertical). |
+| Broad-Crested Trapezoidal Weir | $Q = C_{d1} W_b h^{1.5} + C_{d2} Z h^{2.5}$ | Standard Open-Channel Hydraulics (Henderson, 1966; Chow, 1959) | **DEFAULTED** (Unsourced calibration) | $C_{d1} = 1.70 \text{ m}^{1/2}/\text{s}$ (rectangular weir), $C_{d2} = 1.35 \text{ m}^{1/2}/\text{s}$ (triangular side weir, $Z$ horizontal to 1 vertical). Marked `defaulted` as exact discharge coefficients are not empirically calibrated for evolving embankment breaches. |
 | Natural Dam Breach Parameters | $t_f \times 0.40$, $B_{\text{avg}} \times 1.25$ | Invented placeholder, no source | **ILLUSTRATIVE ONLY** | Factors 0.40 (formation time acceleration) and 1.25 (breach width expansion) are an invented placeholder, no source. Output metadata carries parameter_status=illustrative. |
+
+---
+
+## 1.1 Breach Geometry & Evolution Mechanics
+
+- **Side Slope ($Z$):**
+  - Mode `"overtopping"`: $Z = 1.0$ (1H:1V), standard Froehlich (2008) average side slope for overtopping failures.
+  - Mode `"piping"`: $Z = 0.7$ (0.7H:1V), steeper internal piping erosion channel per Froehlich (2008).
+- **Initial Notch:**
+  - At $t = 0$, $z_b(0) = z_{\text{crest}}$ and $w_b(0) = 0.0$ m. There is no pre-existing notch or pre-incision; water spills only when reservoir stage exceeds $z_{\text{crest}}$.
+- **Growth Law:**
+  - For $t \in [0, t_f]$, linear enlargement:
+    $$w_b(t) = W_{\text{bottom}} \cdot \frac{t}{t_f}, \quad z_b(t) = z_{\text{crest}} - h_b \cdot \frac{t}{t_f}$$
+  - For $t > t_f$, terminal static geometry: $w_b(t) = W_{\text{bottom}}$, $z_b(t) = z_{\text{crest}} - h_b$.
+- **Bottom Width Rule ($W_{\text{bottom}}$):**
+  - Defined as $W_{\text{bottom}} = \max(0.0, B_{\text{avg}} - Z \cdot h_b)$.
+  - When $B_{\text{avg}} \le Z \cdot h_b$ (e.g. deep narrow breach with $V_w = 1\times 10^6\text{ m}^3$ and $h_b = 40\text{ m}$ where $B_{\text{avg}} \approx 33.82\text{ m} < 40\text{ m}$), $W_{\text{bottom}}$ clamps strictly to $0.0$ m.
+  - Under $W_{\text{bottom}} = 0.0$ m, the rectangular weir term vanishes ($1.70 \cdot 0 \cdot h^{1.5} = 0$), and routing transitions continuously and smoothly to pure triangular weir outflow ($Q = C_{d2} Z h^{2.5}$).
+
 
 ---
 

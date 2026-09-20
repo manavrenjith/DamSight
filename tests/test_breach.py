@@ -449,6 +449,8 @@ def test_hydrograph_file_exports(tmp_path):
     assert "clamp_active_before_recession" in meta
 
 
+
+
 def test_hydrograph_recession_limb_decays_without_discontinuity():
     """Verify that breach discharge Q(t) decays smoothly without discontinuities after peak."""
     v_init = 2.5e7  # 25 MCM
@@ -549,3 +551,48 @@ def test_hydrograph_tail_asymptotic_recession_and_clamp_invariance():
     assert (
         res.clamp_active_steps == 0
     ), f"Found {res.clamp_active_steps} clamp bindings during recession!"
+
+
+def test_breach_bottom_width_clamped_to_zero_when_b_avg_less_than_z_times_hb():
+    """Verify that when Froehlich B_avg < Z * h_b, bottom width clamps to 0.0 (forming triangular notch).
+
+    Worked calculation:
+      V_w = 1.0e6 m3, h_b = 40.0 m, overtopping (K_o = 1.3, Z = 1.0)
+      B_avg = 0.27 * 1.3 * (1.0e6 ^ 0.32) * (40.0 ^ 0.04) ≈ 33.816 m
+      Z * h_b = 1.0 * 40.0 = 40.0 m
+      B_avg - Z * h_b = 33.816 - 40.0 = -6.184 m <= 0
+      Expected bottom_width_m = 0.0 m.
+    Routing then proceeds cleanly using purely triangular weir flow.
+    """
+    v_w = 1.0e6
+    h_b = 40.0
+    crest_z = 85.0
+    cd_rect = 1.70
+    cd_tri = 1.35
+
+    params = estimate_breach_parameters(
+        reservoir_volume_m3=v_w,
+        breach_height_m=h_b,
+        water_depth_m=h_b,
+        mode="overtopping",
+    )
+
+    # 1. Assert theoretical invariants
+    assert params.breach_width_avg_m < params.side_slope_z * h_b
+    assert params.bottom_width_m == 0.0, f"Expected bottom width 0.0 m, got {params.bottom_width_m}"
+
+    # 2. Simulate hydrograph: triangular weir flow
+    res = generate_breach_hydrograph(
+        params=params,
+        crest_elevation_m=crest_z,
+        cd_rect=cd_rect,
+        cd_tri=cd_tri,
+        dt_s=5.0,
+    )
+
+    assert res.peak_discharge_hydrograph_m3s > 0.0
+    assert res.mass_conserved is True
+    assert res.drawdown_monotonic is True
+    assert np.all(res.breach_width_m == 0.0), "Breach bottom width must remain 0.0 throughout"
+    assert res.total_outflow_volume_m3 > 0.95 * v_w
+

@@ -58,7 +58,11 @@ With $Z = 1.0$ (standard overtopping trapezoid) and $C_{d,\text{tri}} = 1.35$:
 The $h_{\text{water}}^{2.5}$ scaling strongly amplifies peak discharge for deep breaches ($h_b \ge 25\text{ m}$).
 
 ### C. Scaling Disparity: Hydrograph Weir Flow vs. Froehlich (1995) Empirical Fit
-- **Froehlich (1995):** $Q_p = 0.607 \cdot V_w^{0.295} \cdot h_w^{1.24}$.
-  The empirical exponent on water depth is **$1.24$**. Froehlich's regression was fitted to historical field cases where tailwater submergence, channel friction, erosion delays, and valley constrictions throttled peak outflows.
-- **Physical Level-Pool Routing:** Uses idealized broad-crested weir flow with exponents **$1.50$** (rectangular) and **$2.50$** (triangular), assuming unchoked, frictionless free discharge.
-- When $V_w \ge 2.5 \times 10^7\text{ m}^3$ and $h_w \ge 25\text{ m}$, the difference in depth exponents ($h_w^{1.5}/h_w^{1.24} = h_w^{0.26} \approx 2.3$) naturally pushes the ratio toward $1.95 - 2.26$.
+- **Physical Level-Pool Routing in Code (`generate_breach_hydrograph`):**
+  - Uses broad-crested weir formulation: $Q(t) = C_{d,\text{rect}} \cdot w_b(t) \cdot h_{\text{water}}^{1.5} + C_{d,\text{tri}} \cdot Z \cdot h_{\text{water}}^{2.5}$.
+  - Assumes unchoked free discharge with zero tailwater submergence backpressure and frictionless exit.
+  - Breach geometry grows linearly over formation time $t_f$: $w_b(t) = W_{\text{bottom}} \cdot (t / t_f)$ and $z_b(t) = z_{\text{crest}} - h_b \cdot (t / t_f)$.
+- **Froehlich (1995) Regression:**
+  - $Q_p = 0.607 \cdot V_w^{0.295} \cdot h_w^{1.24}$ has an empirical exponent of $1.24$ on water depth.
+  - When $V_w \ge 2.5 \times 10^7\text{ m}^3$ and $h_w \ge 25\text{ m}$, the difference in depth scaling exponents ($h_w^{1.5} / h_w^{1.24} = h_w^{0.26} \approx 2.3$) between frictionless level-pool weir flow and Froehlich's regression fit naturally causes the simulated hydrograph peak to exceed Froehlich $Q_p$ by $1.95 - 2.26\times$.
+
