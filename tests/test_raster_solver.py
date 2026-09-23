@@ -212,6 +212,7 @@ def base_60m_run(synthetic_valley_site, tmp_path_factory):
 
 
 
+@pytest.mark.slow
 def test_synthetic_raster_georeferencing(synthetic_valley_site, base_60m_run):
     """Test 2a: GEOREFERENCING contract and orientation sensitivity proof.
 
@@ -280,6 +281,7 @@ def test_synthetic_raster_georeferencing(synthetic_valley_site, base_60m_run):
         evaluate_pixel_assertions(depth_rot90, expected_shape, inlet_rc, downstream_40m_rc, ridge_rc)
 
 
+@pytest.mark.slow
 def test_synthetic_raster_mass_balance(synthetic_valley_site, base_60m_run, tmp_path):
     """Test 2b: MASS conservation.
 
@@ -374,6 +376,7 @@ def test_synthetic_raster_mass_balance(synthetic_valley_site, base_60m_run, tmp_
     assert outflow_err <= 0.02, f"Transmissive outflow error {outflow_err:.4%} exceeded 2% gate"
 
 
+@pytest.mark.slow
 def test_synthetic_raster_valley_containment_and_arrival(synthetic_valley_site, base_60m_run):
     """Test 2c: VALLEY containment and arrival time monotonicity along centreline.
 
@@ -421,6 +424,7 @@ def test_synthetic_raster_valley_containment_and_arrival(synthetic_valley_site, 
     )
 
 
+@pytest.mark.slow
 def test_synthetic_raster_roughness_impact(synthetic_valley_site, base_60m_run, tmp_path):
     """Test 2d: ROUGHNESS USED.
 
@@ -464,6 +468,7 @@ def test_synthetic_raster_roughness_impact(synthetic_valley_site, base_60m_run, 
     )
 
 
+@pytest.mark.slow
 def test_synthetic_raster_mesh_resolution_sensitivity(synthetic_valley_site, base_60m_run, tmp_path):
     """Test 2e: MESH resolution sensitivity: 60 m vs 30 m.
 
