@@ -1,0 +1,10 @@
+{
+  "solver": "anuga",
+  "version": "4.0.0",
+  "install_method": "conda-forge",
+  "mesh_resolution_m": 120.0,
+  "boundary_type": "transmissive",
+  "runtime_s": 428.37108993530273,
+  "mass_balance_error": 0.0,
+  "warnings": []
+}

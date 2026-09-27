@@ -91,7 +91,7 @@ solver:
   far_field: delft3dfm
   baseline: anuga
   near_field: none
-  mesh_resolution_m: 30.0
+  mesh_resolution_m: 120.0
 ensemble:
   n_members: 100
   parameters:

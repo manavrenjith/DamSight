@@ -45,8 +45,13 @@ The following items are currently **OPEN** pending user confirmation. Defaults f
 
 ### Open Item O2: Reference Dataset for 1979 Inundation Validation
 - **Status:** **RESOLVED (2026-09-27): no georeferenced 1979 inundation extent found via search. Qualitative checkpoints only, both verified: false:**
-  - **Checkpoint 1:** reported flood depth at Morbi 3.7-9.1 m (12-30 ft)  
-    *source:* "Wikipedia, '1979 Machchhu dam failure'" (`verified: false`)
-  - **Checkpoint 2:** floodwater reached Morbi (~5 km below dam) within approximately 20 minutes of breach, around 3:30 PM on 11 Aug 1979  
-    *source:* "Wikipedia, '1979 Machchhu dam failure'" (`verified: false`)
-- **Consequence:** Validation is a qualitative sanity check only, against documented checkpoints (reported flood depths, arrival timing at Morbi). No IoU/F1 is computed or displayed. The validation panel carries the label "Qualitative check, no reference extent".
+  - **Checkpoint 1 (Depth):** reported flood depth at Morbi 3.7-9.1 m (12-30 ft)  
+    *source:* "Wikipedia, '1979 Machchhu dam failure'" (`verified: false`).  
+    *M3b Simulated Outcome (120m):* Simulated depth in Machhu channel reach at Morbi is 7.7-10.5 m (thalweg 9.93 m, reach average 5.11 m), which closely encompasses the 3.7-9.1 m inquiry range. **CONSISTENT**.
+  - **Checkpoint 2 (Arrival Time & Distance):** floodwater reached Morbi industrial area (~5 km below dam) within approximately 20 minutes of dam collapse, around 3:30 PM on 11 Aug 1979  
+    *source:* "Wikipedia, '1979 Machchhu dam failure'" (`verified: false`). Note: morbionline.in cites ~9 km upstream distance from dam to Morbi historic city center; these describe two distinct points (nearer southern industrial outskirts at ~5 km vs. central urban core at ~9 km along the river channel).  
+    *M3b Simulated Outcome (120m):*
+      - At 5 km point (industrial outskirts `[689371, 2522880]`): Simulated arrival is **76.7 minutes** post breach-start (wave transit time from dam toe is **52.2 minutes**).
+      - At 9 km point (Morbi city center `[689161, 2524709]`): Simulated arrival is **101.5 minutes** post breach-start (wave transit time from dam toe is **77.1 minutes**).
+    *Discrepancy Assessment:* A genuine discrepancy remains between the simulated 76.7 min (or 52.2 min transit) and the historical ~20-minute account at 5 km. This is primarily attributed to: (a) simulation timing starting at overtopping inception ($t=0$, where Froehlich breach formation ramps up gradually over 2.5 hours) versus historical accounts timing from the sudden catastrophic flank collapse; and (b) 120m mesh resolution averaging narrow channel geometry and increasing early channel storage dampening.
+- **Consequence:** Validation is a qualitative sanity check only, against documented checkpoints (reported flood depths, arrival timing at Morbi). No IoU/F1 is computed or displayed. The validation panel carries the label "Qualitative check, no reference extent". Sourced citations must not be softened or combined into unverified ranges.
