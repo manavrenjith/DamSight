@@ -23,15 +23,31 @@
 The following items are currently **OPEN** pending user confirmation. Defaults from `docs/SPEC.md` are documented below:
 
 ### Open Item O1: Target Execution Hardware
-- **Status:** **OPEN**
-- **Question:** What hardware is available (CPU cores, RAM, NVIDIA GPU)?
-- **Default if unanswered:** Assume CPU-only, 8 cores, 16 GB RAM. Ensemble limited to 100 members on a coarse mesh. SPH restricted to a tiny benchmark.
-- **Affected Pipeline Stages:** Ensemble size (M8), SPH near-field scope (M13), mesh resolution.
+- **Status:** **RESOLVED**, with two fields pending benchmark (2026-09-23)
+- **Answer (measured, not assumed):**
+  - CPU: 11th Gen Intel Core i5-1135G7 @ 2.40GHz, 4 physical cores / 8 threads
+  - RAM: 7.6 GB (as reported by Windows)
+  - GPU: none for compute. Intel Iris Xe integrated graphics only, no dedicated VRAM (shares system RAM). No NVIDIA/CUDA.
+  - Free disk on D:: ~100 GB free of ~201 GB (measured 2026-09-23 via Get-Volume)
+  - OS: Windows 11 Home
+- **Measured via:** PowerShell Get-CimInstance / Get-Volume queries, 2026-09-23
+- **Deviation from SPEC default (CPU-only, 8 cores, 16 GB):** YES. Half the cores, about half the RAM.
+- **Consequences:**
+  - Ensemble size (M8): **PENDING BENCHMARK.** Do not assume 100. Time one real Site A run at the chosen mesh, then set N = time budget / per-run time.
+  - Mesh resolution ceiling: **PENDING BENCHMARK.** Memory is the binding limit. Set from measured wall time and peak RAM.
+  - SPH near-field (M13): **DROPPED** (no CUDA GPU, 8 GB RAM).
+  - ML surrogate: CPU-only training; keep models small.
+  - Delft3D FM: decide after licence review. Likely to run elsewhere (heaviest RAM user). If run locally, it shares the disk budget below.
+  - Disk budget: cap `outputs/` at 20 GB; keep only summary rasters (max depth, arrival, percentiles) for ensemble members, not per-timestep frames; keep at least 20 GB free.
+  - Workflow: close heavy apps during runs; use `-m "not slow"` for routine test runs.
 
 ---
 
 ### Open Item O2: Reference Dataset for 1979 Inundation Validation
-- **Status:** **OPEN**
-- **Question:** What is the authoritative source for the 1979 Machhu-II inundation reference extent (published study, GIS polygon, or historical survey map)?
-- **Default if unanswered:** Do not invent an extent. Validate against documented qualitative checkpoints (reported maximum flood depths and arrival timing at Morbi) and label it a qualitative sanity check, not an empirical F1/IoU score.
-- **Affected Pipeline Stages:** Validation panel (M6).
+- **Status:** **OPEN, provisional default applied** (2026-09-23). Search not yet performed.
+- **Search performed:** <<FILL after searching: sources checked, e.g. CWC / state irrigation dept reports, India-WRIS, academic papers on the Morbi flood, inquiry commission reports, newspaper archives; date>>
+- **Provisional answer (SPEC default):** No authoritative 1979 inundation extent is assumed to exist. Do not invent one.
+- **Consequence:** Validation is a qualitative sanity check only, against documented checkpoints (reported flood depths, arrival timing at Morbi). No IoU/F1 is computed or displayed. The validation panel carries the label "Qualitative check, no reference extent".
+- **Checkpoints (each needs a citation, all `verified: false`):**
+  - <<FILL: value, source, page/URL>>
+- **To close O2:** after the search, either change Status to RESOLVED with "not found" (keep this text), or replace with a citation, format, georeferencing status and caveats if an extent is found. In that case, label it "Historical reference (unverified)" until cross-checked.
