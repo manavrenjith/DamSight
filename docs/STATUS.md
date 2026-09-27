@@ -1,9 +1,9 @@
 # Project Status: DamSight
 
-**Current Phase:** Milestone 3 (M3a / M3b-0 Complete, tag `m3b0-pass`)  
+**Current Phase:** Milestone 3 (M3b Real Complete, tag `m3b-real-pass`)  
 **Last Updated:** September 27, 2026  
 **Active Conda Environment:** `damsight` (Python 3.11.16, ANUGA 4.0.0 installs natively on Windows from conda-forge; env = damsight (py3.11))  
-**Test Suite Status:** 64 collected (64 passing in full run, 57 passing / 7 deselected with `-m "not slow"`)  
+**Test Suite Status:** 64 collected (64 passing in full run in 200.86s, 57 passing / 7 deselected with `-m "not slow"` in 18.14s)  
 **Linter & Type Checking Status:** Ruff (Clean), Black (Formatted), MyPy (`solvers/base.py` Clean)  
 
 ---
@@ -184,4 +184,4 @@ In strict accordance with Ground Rule 2 and Section 3 of `docs/SPEC.md`, the fol
 10. **Automated Validation Module (`src/damsight/validate/`):**
     - Contains `__init__.py` only. Out of scope for base MVP demo (Milestone 10).
 
-*Summary Assessment:* This state is completely expected and consistent with the project milestone plan. Milestones 0 through 3 (Config, Ingestion, Breach Hydrograph, and 2D Hydrodynamic Solver) are fully implemented, tested, and validated against their respective gates.
+*Summary Assessment:* All the above modules remain stubbed with `__init__.py` only per the last audit. This is entirely expected given the MVP freeze scope targeting foundational hydrodynamic core Milestones (M0-M3b complete, M4-M8 remaining roadmap target, and M9-M12 out of scope). Milestones 0 through 3 (Config, Ingestion, Breach Hydrograph, and 2D Hydrodynamic Solver) are fully implemented, tested, and validated against their respective gates.
