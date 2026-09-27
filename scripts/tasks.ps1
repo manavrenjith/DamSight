@@ -51,7 +51,7 @@ switch ($Task.ToLower()) {
         Write-Host "not implemented yet"
     }
     "demo" {
-        Write-Host "not implemented yet"
+        python scripts/demo_walkthrough.py
     }
     "help" {
         Show-Help

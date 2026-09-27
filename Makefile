@@ -43,4 +43,4 @@ precompute:
 	@echo "not implemented yet"
 
 demo:
-	@echo "not implemented yet"
+	python scripts/demo_walkthrough.py

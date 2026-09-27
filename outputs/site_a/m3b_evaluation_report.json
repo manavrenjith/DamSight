@@ -79,7 +79,7 @@
         "city_center_9km": {
           "location": "Morbi City Center / Urban Core",
           "coordinates": [689161.2, 2524708.9],
-          "distance_from_dam_channel_m": ~9000.0,
+          "distance_from_dam_channel_m": 9000.0,
           "simulated_arrival_from_t0_min": 101.5,
           "simulated_wave_transit_from_dam_toe_min": 77.1,
           "simulated_peak_depth_thalweg_m": 9.93,
