@@ -3,13 +3,19 @@ name: "TODO_VERIFY: Machhu-I / Machhu-II chain"
 type: cascade
 data_status:
   dam_parameters: unverified
-crs: "TODO_VERIFY"
+crs: "EPSG:32642"
 aoi:
+  # Coarse approximation pending precise dam location.
+  # Anchor: Morbi city center (22.81731°N, 70.83770°E; UTM 42N [688605.56, 2524469.49])
+  # extended ~15km upstream (west/south) to safely contain dam location (~9km upstream)
+  # and ~10km downstream/around Morbi to cover likely inundation extent.
+  # source: "Morbi city coordinates cross-verified from WorldAtlas/independent geo sources; dam offset distance from Wikipedia/ASDSO case study reports of ~9km upstream"
+  # verified: false
   bbox:
-    - "TODO_VERIFY"
-    - "TODO_VERIFY"
-    - "TODO_VERIFY"
-    - "TODO_VERIFY"
+    - 673600.0
+    - 2509400.0
+    - 698600.0
+    - 2534500.0
 dams:
   - id: machhu_1
     role: upstream
@@ -24,10 +30,15 @@ dams:
     source: "TODO: cite"
   - id: machhu_2
     role: downstream
+    # source: "visually identified against ingested Copernicus 30m DEM, linear embankment feature crossing Machhu river channel near Jodhpur village, cross-referenced against ~9km upstream-of-Morbi distance and ~3900m crest length citation"
+    # verified: false
     location:
-      - "TODO_VERIFY"
-      - "TODO_VERIFY"
-    crest_elevation_m: "TODO_VERIFY"
+      - 691350.0
+      - 2518500.0
+    crest_elevation_m:
+      value: 61.0
+      source: "sampled from ingested Copernicus 30m DEM at identified embankment location"
+      verified: false
     dam_height_m:
       value: 22.56
       source: "ASDSO/dam failure case study, Machhu Dam II (Gujarat, India, 1979), citing official inquiry report"

@@ -3,7 +3,7 @@
 **Current Phase:** Milestone 3 (M3a / M3b-0 Complete, tag `m3b0-pass`)  
 **Last Updated:** September 27, 2026  
 **Active Conda Environment:** `damsight` (Python 3.11.16, ANUGA 4.0.0 installs natively on Windows from conda-forge; env = damsight (py3.11))  
-**Test Suite Status:** 61 collected (61 passing in full run, 54 passing / 7 deselected with `-m "not slow"`)  
+**Test Suite Status:** 64 collected (64 passing in full run, 57 passing / 7 deselected with `-m "not slow"`)  
 **Linter & Type Checking Status:** Ruff (Clean), Black (Formatted), MyPy (`solvers/base.py` Clean)  
 
 ---
@@ -12,11 +12,11 @@
 
 | Milestone | Scope | Status | Notes |
 |---|---|---|---|
-| **Milestone 0** | Repo layout, v2 config schema, `TODO_VERIFY` tracking, Makefile & tasks | **COMPLETE** | Schema v2, site_a.yaml, 16 config tests passing. |
-| **Milestone 1** | Data ingestion, DEM priority-flood conditioning, land cover, WorldPop, OSM, Manning lookup | **COMPLETE** | Offline mode, grid alignment, audit logging in `report.json`. |
+| **Milestone 0** | Repo layout, v2 config schema, `TODO_VERIFY` tracking, Makefile & tasks | **COMPLETE** | Schema v2, site_a.yaml, 20 config tests passing. |
+| **Milestone 1** | Data ingestion, DEM priority-flood conditioning, land cover, WorldPop, OSM, Manning lookup | **COMPLETE (REAL DATA INGESTED)** | Site A real data ingested: Copernicus DEM 30m, ESA WorldCover, WorldPop 2020, OSM Overpass extract (3,179 roads, 1,672 bldgs, 31 places), 837x833 grid in EPSG:32642. Offline mode & error handling verified. |
 | **Milestone 2** | Froehlich (1995/2008) breach equations, broad-crested weir hydrograph, level-pool drawdown | **COMPLETE** | Analytical worked examples, mass conservation, smooth recession decay. |
 | **Pre-M3 Follow-up** | Preflight, linting, GDAL nodata bug, allow_unverified guard, fabrication purge, warnings filter, synthetic figure | **COMPLETE** | All 8 tasks implemented and verified. |
-| **Milestone 3** | Hydrodynamic Solvers: ANUGA (guaranteed baseline, M3a/M3b-0 complete); Delft3D FM dropped per O1 hardware constraints | **IN PROGRESS (M3a/M3b-0 PASS)** | Tag `m3b0-pass` verified (230469e); 61 tests passing. ANUGA 2D solver, raster validation suite, Ritter/Stoker benchmarks implemented. |
+| **Milestone 3** | Hydrodynamic Solvers: ANUGA (guaranteed baseline, M3a/M3b-0 complete); Delft3D FM dropped per O1 hardware constraints | **IN PROGRESS (M3a/M3b-0 PASS)** | Tag `m3b0-pass` verified (230469e); 63 tests passing. ANUGA 2D solver, raster validation suite, Ritter/Stoker benchmarks implemented. |
 
 ---
 
@@ -73,3 +73,27 @@
 
 8. **Repository Tracking:**
    - Renamed `agents.md` to `AGENTS.md` via two-step git mv.
+
+---
+
+## 3. Milestone 1: Real Ingestion Run (Site A — Machhu-II / Morbi)
+
+- **Date:** September 27, 2026
+- **Status:** **REAL INGESTION COMPLETE & VERIFIED**
+- **AOI Specification:**
+  - Anchor: Morbi city center (22.81731°N, 70.83770°E, verified via WorldAtlas/independent sources; UTM 42N [688605.56, 2524469.49]).
+  - Bounding Box: `[673600.0, 2509400.0, 698600.0, 2534500.0]` (EPSG:32642 meters; ~25 km x 25.1 km).
+  - CRS: `EPSG:32642` (WGS 84 / UTM zone 42N).
+- **Ingested Datasets & Outputs:**
+  - **DEM:** Copernicus 30m Global DEM (`Copernicus_DSM_COG_10_N22_00_E070_00_DEM.tif`, 39,564,695 bytes). Conditioned via Wang & Liu (2006) priority-flood algorithm: 55,209 cells modified, max fill 12.73 m, mean fill 0.32 m, total volume filled $15.67 \times 10^6 \text{ m}^3$, void percentage: **0.000%**. Grid shape: 837 rows x 833 cols. Min elevation: 13.61 m, Max: 103.71 m.
+  - **Land Cover:** ESA WorldCover 10m (`ESA_WorldCover_10m_2021_v200_N21E069_Map.tif`, 92,933,241 bytes). Resampled to DEM grid (837x833). Classes present: 10, 20, 30, 40, 50, 60, 80, 90. Unmapped cells: 0.
+  - **Manning's Roughness:** Derived from WorldCover classes using literature lookup table (`data/manning_lookup.csv`). Min $n = 0.025$, Max $n = 0.150$, Mean $n = 0.0534$.
+  - **Population:** WorldPop 2020 India population raster (`ind_ppp_2020_1km_Aggregated_UNadj.tif`, 18,313,124 bytes). Complete dataset fetched and reprojected to DEM grid (837x833) using density-scaled conservation ($D_{\text{src}} = C_{\text{src}} / A_{\text{src}}$, reprojected and scaled by $A_{\text{dst}}$). Fixed 828x inflation bug (reduced reported population from spurious 336M to physically plausible **361,261.2** for Morbi AOI).
+  - **OSM Infrastructure Vectors:** Real OSM vectors fetched via Overpass API:
+    - Roads: 3,179 features clipped to AOI (`roads.geojson`).
+    - Buildings: 1,672 features clipped to AOI (`buildings.geojson`).
+    - Places: 31 features clipped to AOI (`places.geojson`).
+- **Offline Error Handling Verified:**
+  - Renamed `Copernicus_DSM_COG_10_N22_00_E070_00_DEM.tif` to `.bak`.
+  - Confirmed `MissingDatasetError` explicitly raised naming the missing dataset and expected path. Restored file.
+- **Test Integrity:** 64/64 tests passing (0 failures, 0 regressions). All empirical breach and config unverified guards intact. Permanent regression test `test_population_total_conserved_after_resampling` added to prevent population inflation.

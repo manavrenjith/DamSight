@@ -187,11 +187,41 @@ def run_ingestion(
     raw_dir = site_cache / "raw"
 
     # Determine input sources or check offline availability
-    dem_raw_path = (
-        Path(config.inputs.dem.path) if config.inputs.dem.path else raw_dir / "raw_dem.tif"
-    )
-    lc_raw_path = raw_dir / "raw_worldcover.tif"
-    pop_raw_path = raw_dir / "raw_population.tif"
+    dem_raw_path = Path(config.inputs.dem.path) if config.inputs.dem.path else None
+    if not dem_raw_path or not dem_raw_path.exists():
+        for candidate in [
+            site_cache / "Copernicus_DSM_COG_10_N22_00_E070_00_DEM.tif",
+            raw_dir / "raw_dem.tif",
+        ]:
+            if candidate.exists():
+                dem_raw_path = candidate
+                break
+    if not dem_raw_path:
+        dem_raw_path = site_cache / "Copernicus_DSM_COG_10_N22_00_E070_00_DEM.tif"
+
+    lc_raw_path = None
+    for candidate in [
+        site_cache / "ESA_WorldCover_10m_2021_v200_N21E069_Map.tif",
+        raw_dir / "raw_worldcover.tif",
+    ]:
+        if candidate.exists():
+            lc_raw_path = candidate
+            break
+    if not lc_raw_path:
+        lc_raw_path = site_cache / "ESA_WorldCover_10m_2021_v200_N21E069_Map.tif"
+
+    pop_raw_path = None
+    for candidate in [
+        site_cache / "ind_ppp_2020_1km_Aggregated_UNadj.tif",
+        site_cache / "ind_ppp_2020.tif",
+        raw_dir / "raw_population.tif",
+    ]:
+        if candidate.exists():
+            pop_raw_path = candidate
+            break
+    if not pop_raw_path:
+        pop_raw_path = site_cache / "ind_ppp_2020_1km_Aggregated_UNadj.tif"
+
     roads_raw_path = raw_dir / "raw_roads.geojson"
     buildings_raw_path = raw_dir / "raw_buildings.geojson"
     places_raw_path = raw_dir / "raw_places.geojson"
@@ -214,6 +244,10 @@ def run_ingestion(
                 f"(Source specified: {config.inputs.dem.source})."
             )
 
+    aoi_bbox = None
+    if config.aoi and config.aoi.bbox and not any(is_todo_value(x) for x in config.aoi.bbox):
+        aoi_bbox = tuple(float(x) for x in config.aoi.bbox)
+
     # 1. Condition DEM and establish master grid profile
     out_dem = site_cache / "dem.tif"
     _dem_arr, _dem_transform, cond_result, elev_stats = condition_and_save_dem(
@@ -222,6 +256,7 @@ def run_ingestion(
         target_crs=target_crs,
         resolution_m=res_m,
         max_fill_depth=15.0,
+        bbox=aoi_bbox,
     )
 
     with rasterio.open(out_dem) as src:
@@ -266,13 +301,13 @@ def run_ingestion(
     out_places = site_cache / "places.geojson"
 
     roads_stat = ingest_vector_exposure(
-        roads_raw_path if roads_raw_path.exists() else None, out_roads, target_crs
+        roads_raw_path if roads_raw_path.exists() else None, out_roads, target_crs, bbox=aoi_bbox
     )
     buildings_stat = ingest_vector_exposure(
-        buildings_raw_path if buildings_raw_path.exists() else None, out_buildings, target_crs
+        buildings_raw_path if buildings_raw_path.exists() else None, out_buildings, target_crs, bbox=aoi_bbox
     )
     places_stat = ingest_vector_exposure(
-        places_raw_path if places_raw_path.exists() else None, out_places, target_crs
+        places_raw_path if places_raw_path.exists() else None, out_places, target_crs, bbox=aoi_bbox
     )
 
     # 5. Compile report.json

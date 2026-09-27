@@ -79,6 +79,21 @@ Manning's $n$ values are mapped from ESA WorldCover 10m classes using `data/mann
 
 ---
 
+## 2.2 Population Resampling & Count Conservation Semantics
+
+- **Extensive Count vs. Intensive Density:** WorldPop rasters store population COUNT per cell (an extensive quantity), not population density. Standard GIS interpolation algorithms (nearest, bilinear, cubic) assume intensive continuous fields (e.g. elevation, temperature) where point values are preserved.
+- **Inflation Bug & Root Cause:** Applying bilinear interpolation directly to raw cell counts inflated total population by the area ratio of the source and destination cells ($A_{\text{src}} / A_{\text{dst}} \approx 828\times$ for 1km to 30m), yielding 336,687,296 people for a 25km x 25km box around Morbi.
+- **Count-Conserving Formulation:** The pipeline converts source counts to ground density:
+  $$D_{\text{src}} = \frac{C_{\text{src}}}{A_{\text{src}}} \quad [\text{persons / m}^2]$$
+  reprojects $D_{\text{src}}$ to the destination grid using bilinear interpolation:
+  $$D_{\text{dst}} = \text{reproject}(D_{\text{src}})$$
+  and integrates back into cell counts:
+  $$C_{\text{dst}} = D_{\text{dst}} \times A_{\text{dst}} \quad [\text{persons / cell}]$$
+  where cell areas $A_{\text{src}}$ and $A_{\text{dst}}$ are computed accurately in square meters (accounting for latitude-dependent meridian convergence for geographic EPSG:4326 grids).
+- **Result & Verification:** Strictly conserves population count ($0.0000\%$ difference on synthetic grids; yields 361,261.2 persons for Morbi AOI vs 406,599 raw WGS84 bounding window). Verified by permanent regression test `test_population_total_conserved_after_resampling`.
+
+---
+
 ## 3. Site Parameters & Verification Status
 
 ### Site A (Candidate: Machhu-II Dam, Morbi, Gujarat)
@@ -88,8 +103,12 @@ Manning's $n$ values are mapped from ESA WorldCover 10m classes using `data/mann
 - **Crest Length:** 3,906.5 m (164.5 m masonry spillway + 3,742 m earthen embankment) (`sourced, verified: false`). Source: Dam failure case study summary (SlideShare), citing 164.5 m crest length of overflow section and 3,742 m total crest length for earth dam.
 - **Catchment Area:** 1,929 $\text{km}^2$ (`sourced, verified: false`). Source: Wikipedia, '1979 Machchhu dam failure'.
 - **Peak Inflow (Disputed Range):** `status: disputed, do not use as a single input value`. Independent inquiry estimate: ~13,027 $\text{m}^3/\text{s}$ (460,000 cfs); Government estimate range: ~17,840 to 26,514 $\text{m}^3/\text{s}$ (630,000–936,000 cfs). Flagged as disputed: not collapsed to a single number or used as a single input value.
-- **Crest Elevation:** `TODO_VERIFY` (Pending official datum verification; genuinely unresolved; requires manual lookup at India-WRIS or CWC NRLD PDF).
-- **Dam Location Coordinates:** `TODO_VERIFY` (Genuinely unresolved; not found via search; requires manual lookup at India-WRIS Machhu_II_Dam_D01498 or CWC NRLD PDF).
+- **Crest Elevation:** 61.0 m MSL (`sampled, verified: false`). Source: sampled from ingested Copernicus 30m DEM at identified embankment location (shoulder elevation 60.93 m). Real derived estimate, not an official survey-grade lookup.
+- **Dam Location Coordinates:** UTM (691350.0, 2518500.0) [Row 533, Col 591 in ingested DEM grid] (`visually identified, verified: false`).
+  *Visual Identification Finding:* Linear embankment feature crossing the Machhu river channel near Jodhpur village (~9 km upstream along channel from Morbi city center). Total ridge length: ~3.9 km (West embankment ~2.27 km + Spillway section ~0.2 km + East embankment ~1.51 km, matching cited 3,906.5 m crest length). Embankment shoulder rises to 60.93 m MSL above a 38.87 m channel invert ($\Delta h = 22.06\text{ m}$, consistent with cited 22.56 m dam height within 0.5 m).
+  *Source:* "visually identified against ingested Copernicus 30m DEM, linear embankment feature crossing Machhu river channel near Jodhpur village, cross-referenced against ~9km upstream-of-Morbi distance and ~3900m crest length citation", `verified: false`.
+- **Coordinate Reference System (CRS):** `EPSG:32642` (WGS 84 / UTM zone 42N). Machhu-II and Morbi are situated at ~70.84°E (UTM zone 42 spans 66°E to 72°E). The SPEC.md example of EPSG:32643 was incorrect for this longitude.
+- **AOI Bounding Box Approximation:** `[673600.0, 2509400.0, 698600.0, 2534500.0]` (EPSG:32642 meters). Anchor: Morbi city center (22.81731°N, 70.83770°E, verified via WorldAtlas/independent sources; projected to UTM 42N [688605.56, 2524469.49]), extended ~15km upstream (west/south) to safely contain the dam location (reported ~9km upstream, exact coordinates not found via web search — not invented) and ~10km downstream/around Morbi to cover likely inundation extent. Source: "Morbi city coordinates cross-verified from WorldAtlas/independent geo sources; dam offset distance from Wikipedia/ASDSO case study reports of ~9km upstream", verified: false.
 - **Breach Geometry:** Overtopping and piping scenarios modeled parametrically.
 - **Topography:** Copernicus 30m Global DEM (GLO-30) assumed as base elevation. Coarse bathymetry assumed flat/interpolated.
 

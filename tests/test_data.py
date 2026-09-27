@@ -267,3 +267,78 @@ def test_population_zeros_preserved_and_exact_void_count(tmp_path):
 
     # Verify no GDAL 1.4013e-45 corruption
     assert not np.any((aligned > 0.0) & (aligned < 1e-30))
+
+
+def test_population_total_conserved_after_resampling(tmp_path):
+    """Regression test: verify population count is strictly conserved when resampling to a finer grid.
+
+    WorldPop rasters store population COUNT per cell (an extensive quantity), not density.
+    Direct interpolator resampling (e.g. bilinear/nearest) treats count as an intensive variable,
+    causing total domain population to inflate by the area ratio (e.g. ~1111x for 1km -> 30m).
+    This test verifies that resampling from a 90m grid to a 30m grid conserves the total population
+    count within tight tolerance (< 0.1%).
+    """
+    from damsight.data.exposure import ingest_population
+
+    raw_pop_path = tmp_path / "raw_coarse_pop.tif"
+    out_pop_path = tmp_path / "aligned_fine_pop.tif"
+
+    # 4x4 coarse grid at 90m resolution (360m x 360m domain)
+    src_res = 90.0
+    src_data = np.array(
+        [
+            [10.0, 20.0, 30.0, 40.0],
+            [50.0, 60.0, 70.0, 80.0],
+            [90.0, 100.0, 110.0, 120.0],
+            [15.0, 25.0, 35.0, 45.0],
+        ],
+        dtype=np.float32,
+    )
+    expected_total = float(np.sum(src_data))  # Exactly 900.0 persons
+
+    src_transform = rasterio.transform.from_origin(600000.0, 2500000.0 + 4 * src_res, src_res, src_res)
+    raw_profile = {
+        "driver": "GTiff",
+        "count": 1,
+        "dtype": "float32",
+        "width": 4,
+        "height": 4,
+        "crs": "EPSG:32643",
+        "transform": src_transform,
+        "nodata": -9999.0,
+    }
+    with rasterio.open(raw_pop_path, "w", **raw_profile) as dst:
+        dst.write(src_data, 1)
+
+    # 12x12 destination DEM grid at 30m resolution (same 360m x 360m domain)
+    dst_res = 30.0
+    dst_transform = rasterio.transform.from_origin(600000.0, 2500000.0 + 12 * dst_res, dst_res, dst_res)
+    dem_profile = {
+        "driver": "GTiff",
+        "count": 1,
+        "dtype": "float32",
+        "width": 12,
+        "height": 12,
+        "crs": "EPSG:32643",
+        "transform": dst_transform,
+        "nodata": -9999.0,
+    }
+
+    aligned, stats = ingest_population(
+        raw_pop_path=raw_pop_path,
+        out_pop_path=out_pop_path,
+        dem_profile=dem_profile,
+        nodata=-9999.0,
+    )
+
+    resampled_total = stats["total_population"]
+    diff_pct = abs(resampled_total - expected_total) / expected_total * 100.0
+
+    # Total must be conserved within 0.1% tolerance
+    assert (
+        diff_pct < 0.1
+    ), f"Population total not conserved: expected {expected_total}, got {resampled_total} (diff {diff_pct:.4f}%)"
+
+    # Confirm individual 30m cell values are scaled by ~1/9th of 90m parent cells (not unscaled 10..120)
+    valid_cells = aligned[aligned != -9999.0]
+    assert np.max(valid_cells) <= (120.0 / 9.0) * 1.5, f"Cell count not appropriately scaled down: {np.max(valid_cells)}"
