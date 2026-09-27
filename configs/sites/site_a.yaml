@@ -28,11 +28,32 @@ dams:
       - "TODO_VERIFY"
       - "TODO_VERIFY"
     crest_elevation_m: "TODO_VERIFY"
-    dam_height_m: "TODO_VERIFY"
-    reservoir_volume_m3: "TODO_VERIFY"
+    dam_height_m:
+      value: 22.56
+      source: "ASDSO/dam failure case study, Machhu Dam II (Gujarat, India, 1979), citing official inquiry report"
+      verified: false
+    reservoir_volume_m3:
+      value: 101020000
+      source: "Wikipedia, '1979 Machchhu dam failure', citing reservoir storage capacity of 101,020 cubic decametres (81,900 acre-feet); cross-checked against Morbi district tourism page citing 100.41 Mm3 (within 1%)"
+      verified: false
     stage_storage_csv: data/site_a/machhu2_stage_storage.csv
     dam_type: embankment
-    spillway_capacity_m3s: "TODO_VERIFY"
+    spillway_capacity_m3s:
+      value: 5663
+      source: "ASDSO case study (200,000 cfs design capacity) independently cross-checked against Morbi local-history source citing 5,663 m3/s; the two figures agree exactly under unit conversion (200,000 cfs = 5663 m3/s)"
+      verified: false
+    crest_length_m:
+      value: 3906.5  # 164.5 m masonry spillway + 3742 m earthen embankment
+      source: "Dam failure case study summary (SlideShare), citing 164.5 m crest length of overflow section and 3742 m total crest length for earth dam"
+      verified: false
+    catchment_area_km2:
+      value: 1929
+      source: "Wikipedia, '1979 Machchhu dam failure'"
+      verified: false
+    peak_inflow_disputed_m3s:
+      independent_inquiry_estimate: "~13,027 m3/s (460,000 cfs)"
+      government_estimate_range: "~17,840 to 26,514 m3/s (630,000-936,000 cfs)"
+      status: "disputed, do not use as a single input value; flag in ASSUMPTIONS.md"
     source: "TODO: cite"
 scenarios:
   - id: A1_hindcast_1979

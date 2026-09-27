@@ -374,7 +374,7 @@ def test_real_site_a_all_todo_verify_raises_for_both_allow_unverified_flags():
 
     if has_todo_in_required:
         # Guard must raise ValueError for BOTH allow_unverified=False and allow_unverified=True
-        with pytest.raises(ValueError, match="TODO_VERIFY"):
+        with pytest.raises(ValueError, match="TODO_VERIFY|allow_unverified=True"):
             get_dam_breach_inputs(dam2, allow_unverified=False)
 
         with pytest.raises(ValueError, match="TODO_VERIFY"):
@@ -461,3 +461,127 @@ def test_unverified_numeric_value_with_source_passes_with_flag_and_returns_sourc
     assert inputs["crest_elevation_m"] == 60.5
     assert inputs["data_status"] == "unverified"
     assert "Govt Gazette 1978" in inputs["sources"] or "State Irrigation Dept" in inputs["sources"]
+
+
+def test_dam_breach_inputs_raises_todo_verify_when_any_field_is_todo():
+    """Synthetic dam fixture with at least one required field literally TODO_VERIFY, others can be anything.
+    Assert ValueError match='TODO_VERIFY' under both allow_unverified=True and allow_unverified=False.
+    """
+    from damsight.breach import get_dam_breach_inputs
+
+    cfg_dict = {
+        "site_id": "site_fixture_todo",
+        "name": "Fixture Site with TODO",
+        "type": "dam",
+        "data_status": {"dam_parameters": "unverified"},
+        "crs": "EPSG:32643",
+        "aoi": {"bbox": [70.0, 22.0, 71.0, 23.0]},
+        "dams": [
+            {
+                "id": "fixture_dam_todo",
+                "role": "single",
+                "location": [70.5, 22.5],
+                "crest_elevation_m": "TODO_VERIFY",
+                "dam_height_m": "TODO_VERIFY",
+                "reservoir_volume_m3": {
+                    "value": 110000000.0,
+                    "source": "Historical Survey 1979",
+                    "verified": False,
+                },
+                "source": "Historical Survey 1979",
+            }
+        ],
+        "inputs": {
+            "dem": {"source": "copernicus_30m"},
+            "landcover": "esa_worldcover",
+            "population": "worldpop",
+            "buildings": "osm",
+            "roads": "osm",
+        },
+        "solver": {"mesh_resolution_m": 30.0},
+        "ensemble": {
+            "n_members": 10,
+            "parameters": {"reservoir_level_m": {"range": [50.0, 60.0]}},
+        },
+        "evacuation": {},
+    }
+    with pytest.warns(UnverifiedValueWarning):
+        config = load_site_config(cfg_dict)
+
+    dam = config.dams[0]
+
+    with pytest.raises(ValueError, match="TODO_VERIFY"):
+        get_dam_breach_inputs(dam, allow_unverified=False)
+
+    with pytest.raises(ValueError, match="TODO_VERIFY"):
+        get_dam_breach_inputs(dam, allow_unverified=True)
+
+
+def test_dam_breach_inputs_raises_without_flag_when_fields_are_unverified_numeric():
+    """Synthetic dam fixture where all required fields are numeric with verified: false, none TODO_VERIFY.
+    Assert ValueError under allow_unverified=False (message should NOT contain 'TODO_VERIFY'), and
+    assert successful return with data_status='unverified' under allow_unverified=True,
+    checking the returned source list is non-empty.
+    """
+    from damsight.breach import get_dam_breach_inputs
+
+    cfg_dict = {
+        "site_id": "site_fixture_unverified_numeric",
+        "name": "Fixture Site Unverified Numeric",
+        "type": "dam",
+        "data_status": {"dam_parameters": "unverified"},
+        "crs": "EPSG:32643",
+        "aoi": {"bbox": [70.0, 22.0, 71.0, 23.0]},
+        "dams": [
+            {
+                "id": "fixture_dam_unverified",
+                "role": "single",
+                "location": [70.5, 22.5],
+                "crest_elevation_m": {
+                    "value": 60.5,
+                    "source": "Historical Report 1979",
+                    "verified": False,
+                },
+                "dam_height_m": {
+                    "value": 24.0,
+                    "source": "Historical Report 1979",
+                    "verified": False,
+                },
+                "reservoir_volume_m3": {
+                    "value": 110000000.0,
+                    "source": "Historical Report 1979",
+                    "verified": False,
+                },
+                "source": "Historical Report 1979",
+            }
+        ],
+        "inputs": {
+            "dem": {"source": "copernicus_30m"},
+            "landcover": "esa_worldcover",
+            "population": "worldpop",
+            "buildings": "osm",
+            "roads": "osm",
+        },
+        "solver": {"mesh_resolution_m": 30.0},
+        "ensemble": {
+            "n_members": 10,
+            "parameters": {"reservoir_level_m": {"range": [50.0, 60.0]}},
+        },
+        "evacuation": {},
+    }
+    with pytest.warns(UnverifiedValueWarning):
+        config = load_site_config(cfg_dict)
+
+    dam = config.dams[0]
+
+    with pytest.raises(ValueError) as exc_info:
+        get_dam_breach_inputs(dam, allow_unverified=False)
+    assert "TODO_VERIFY" not in str(exc_info.value)
+    assert "allow_unverified=True" in str(exc_info.value)
+
+    res = get_dam_breach_inputs(dam, allow_unverified=True)
+    assert res["dam_id"] == "fixture_dam_unverified"
+    assert res["data_status"] == "unverified"
+    assert len(res["sources"]) > 0
+    assert "Historical Report 1979" in res["sources"]
+

@@ -106,6 +106,9 @@ class DamItemConfig(BaseModel):
     stage_storage_csv: str | None = None
     dam_type: str = "embankment"
     spillway_capacity_m3s: float | str | None = None
+    crest_length_m: float | str | None = None
+    catchment_area_km2: float | str | None = None
+    peak_inflow_disputed_m3s: dict[str, Any] | str | None = None
     breach_types: list[str] = Field(default_factory=lambda: ["overtopping", "piping"])
     source: str | None = None
     verified: bool | None = None
@@ -129,6 +132,8 @@ class DamItemConfig(BaseModel):
                 "dam_height_m",
                 "reservoir_volume_m3",
                 "spillway_capacity_m3s",
+                "crest_length_m",
+                "catchment_area_km2",
             ):
                 raw = data.get(key)
                 if isinstance(raw, dict):
@@ -147,6 +152,8 @@ class DamItemConfig(BaseModel):
                         "dam_height_m",
                         "reservoir_volume_m3",
                         "spillway_capacity_m3s",
+                        "crest_length_m",
+                        "catchment_area_km2",
                     ]
                 )
             data["unverified_parameters"] = list(set(unverified))
@@ -220,9 +227,18 @@ class DamItemConfig(BaseModel):
     def check_location(cls, v: Any) -> list[float | str]:
         return validate_float_list(v, "dam.location", expected_len=2)
 
-    @field_validator("crest_elevation_m", "dam_height_m", "reservoir_volume_m3", mode="before")
+    @field_validator(
+        "crest_elevation_m",
+        "dam_height_m",
+        "reservoir_volume_m3",
+        "crest_length_m",
+        "catchment_area_km2",
+        mode="before",
+    )
     @classmethod
-    def check_dimension(cls, v: Any, info: Any) -> float | str:
+    def check_dimension(cls, v: Any, info: Any) -> float | str | None:
+        if v is None:
+            return None
         return validate_maybe_float(v, f"dam.{info.field_name}")
 
     @field_validator("spillway_capacity_m3s", mode="before")
@@ -384,6 +400,8 @@ class SiteConfig(BaseModel):
     solver: SolverConfig
     ensemble: EnsembleConfig
     evacuation: EvacuationConfig
+    catchment_area_km2: float | str | None = None
+    peak_inflow_disputed_m3s: dict[str, Any] | str | None = None
 
     def model_post_init(self, __context: Any, /) -> None:
         for dam in self.dams:

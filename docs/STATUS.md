@@ -1,9 +1,9 @@
 # Project Status: DamSight
 
-**Current Phase:** Milestone 2 Close-out Complete  
-**Last Updated:** September 19, 2026  
+**Current Phase:** Milestone 3 (M3a / M3b-0 Complete, tag `m3b0-pass`)  
+**Last Updated:** September 27, 2026  
 **Active Conda Environment:** `damsight` (Python 3.11.16, ANUGA 4.0.0 installs natively on Windows from conda-forge; env = damsight (py3.11))  
-**Test Suite Status:** 35 / 35 Passing (`pytest -v`)  
+**Test Suite Status:** 61 collected (61 passing in full run, 54 passing / 7 deselected with `-m "not slow"`)  
 **Linter & Type Checking Status:** Ruff (Clean), Black (Formatted), MyPy (`solvers/base.py` Clean)  
 
 ---
@@ -15,8 +15,8 @@
 | **Milestone 0** | Repo layout, v2 config schema, `TODO_VERIFY` tracking, Makefile & tasks | **COMPLETE** | Schema v2, site_a.yaml, 16 config tests passing. |
 | **Milestone 1** | Data ingestion, DEM priority-flood conditioning, land cover, WorldPop, OSM, Manning lookup | **COMPLETE** | Offline mode, grid alignment, audit logging in `report.json`. |
 | **Milestone 2** | Froehlich (1995/2008) breach equations, broad-crested weir hydrograph, level-pool drawdown | **COMPLETE** | Analytical worked examples, mass conservation, smooth recession decay. |
-| **Pre-M3 Follow-up** | Preflight, linting, GDAL nodata bug, allow_unverified guard, fabrication purge, warnings filter, synthetic figure | **COMPLETE** | All 8 tasks implemented and verified. No M3 work started. |
-| **Milestone 3** | Hydrodynamic Solvers: ANUGA (guaranteed) and Delft3D FM (time-boxed) | **NOT STARTED** | Pending user instruction to begin Milestone 3. |
+| **Pre-M3 Follow-up** | Preflight, linting, GDAL nodata bug, allow_unverified guard, fabrication purge, warnings filter, synthetic figure | **COMPLETE** | All 8 tasks implemented and verified. |
+| **Milestone 3** | Hydrodynamic Solvers: ANUGA (guaranteed baseline, M3a/M3b-0 complete); Delft3D FM dropped per O1 hardware constraints | **IN PROGRESS (M3a/M3b-0 PASS)** | Tag `m3b0-pass` verified (230469e); 61 tests passing. ANUGA 2D solver, raster validation suite, Ritter/Stoker benchmarks implemented. |
 
 ---
 

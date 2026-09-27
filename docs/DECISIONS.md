@@ -13,7 +13,7 @@
 | **D3** | Validation | Historical record for Site A (1979 event); Sentinel-1 for satellite-era events (Site C, Kerala 2018). | Section 7.10 |
 | **D4** | Data honesty | All Machhu figures stay `verified: false` until reconciled. Public sources disagree. | Ground Rule 3 |
 | **D5** | Earth Engine | Available. Non-commercial registration, Community quota tier (150 EECU-hours). Live detection enabled, cached fallback retained. | Section 7.9 |
-| **D6** | Delft3D FM & Solver Baseline | Proceed with Delft3D FM time-boxed setup (M4), benchmark first; ANUGA remains guaranteed baseline solver. ANUGA 4.0.0 installs natively on Windows from conda-forge; env = damsight (py3.11). | Section 7.4 |
+| **D6** | Delft3D FM & Solver Baseline | Delft3D FM is DROPPED for the MVP demo (2026-09-27), given O1 hardware constraints (4 cores/8 threads, 7.6GB RAM, no CUDA GPU). ANUGA is the sole solver for Site A. Revisit only if hardware changes or Delft3D is confirmed to run on other infrastructure before the MVP freeze. | Section 7.4 |
 | **D7** | Differentiators | Probabilistic maps, ML surrogate, evacuation feasibility, cascade failure, satellite-triggered natural-dam watch. | Section 1 |
 
 ---
@@ -44,10 +44,9 @@ The following items are currently **OPEN** pending user confirmation. Defaults f
 ---
 
 ### Open Item O2: Reference Dataset for 1979 Inundation Validation
-- **Status:** **OPEN, provisional default applied** (2026-09-23). Search not yet performed.
-- **Search performed:** <<FILL after searching: sources checked, e.g. CWC / state irrigation dept reports, India-WRIS, academic papers on the Morbi flood, inquiry commission reports, newspaper archives; date>>
-- **Provisional answer (SPEC default):** No authoritative 1979 inundation extent is assumed to exist. Do not invent one.
+- **Status:** **RESOLVED (2026-09-27): no georeferenced 1979 inundation extent found via search. Qualitative checkpoints only, both verified: false:**
+  - **Checkpoint 1:** reported flood depth at Morbi 3.7-9.1 m (12-30 ft)  
+    *source:* "Wikipedia, '1979 Machchhu dam failure'" (`verified: false`)
+  - **Checkpoint 2:** floodwater reached Morbi (~5 km below dam) within approximately 20 minutes of breach, around 3:30 PM on 11 Aug 1979  
+    *source:* "Wikipedia, '1979 Machchhu dam failure'" (`verified: false`)
 - **Consequence:** Validation is a qualitative sanity check only, against documented checkpoints (reported flood depths, arrival timing at Morbi). No IoU/F1 is computed or displayed. The validation panel carries the label "Qualitative check, no reference extent".
-- **Checkpoints (each needs a citation, all `verified: false`):**
-  - <<FILL: value, source, page/URL>>
-- **To close O2:** after the search, either change Status to RESOLVED with "not found" (keep this text), or replace with a citation, format, georeferencing status and caveats if an extent is found. In that case, label it "Historical reference (unverified)" until cross-checked.

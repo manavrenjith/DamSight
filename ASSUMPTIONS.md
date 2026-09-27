@@ -82,9 +82,14 @@ Manning's $n$ values are mapped from ESA WorldCover 10m classes using `data/mann
 ## 3. Site Parameters & Verification Status
 
 ### Site A (Candidate: Machhu-II Dam, Morbi, Gujarat)
-- **Dam Height ($h_b$):** `TODO_VERIFY` (Pending verified entry from Central Water Commission / India-WRIS records).
-- **Crest Elevation:** `TODO_VERIFY` (Pending official datum verification).
-- **Reservoir Volume ($V_w$):** `TODO_VERIFY` (Pending official stage-storage documentation).
+- **Dam Height ($h_b$):** 22.56 m (`sourced, verified: false`). Source: ASDSO/dam failure case study, Machhu Dam II (Gujarat, India, 1979), citing official inquiry report.
+- **Reservoir Volume ($V_w$):** 101,020,000 $\text{m}^3$ (101.02 MCM) (`sourced, verified: false`). Source: Wikipedia, '1979 Machchhu dam failure', citing reservoir storage capacity of 101,020 cubic decametres (81,900 acre-feet); cross-checked against Morbi district tourism page citing 100.41 Mm3 (within 1%).
+- **Spillway Capacity:** 5,663 $\text{m}^3/\text{s}$ (200,000 cfs) (`sourced, verified: false`). Source: ASDSO case study (200,000 cfs design capacity) independently cross-checked against Morbi local-history source citing 5,663 $\text{m}^3/\text{s}$; the two figures agree exactly under unit conversion (200,000 cfs = 5663 $\text{m}^3/\text{s}$).
+- **Crest Length:** 3,906.5 m (164.5 m masonry spillway + 3,742 m earthen embankment) (`sourced, verified: false`). Source: Dam failure case study summary (SlideShare), citing 164.5 m crest length of overflow section and 3,742 m total crest length for earth dam.
+- **Catchment Area:** 1,929 $\text{km}^2$ (`sourced, verified: false`). Source: Wikipedia, '1979 Machchhu dam failure'.
+- **Peak Inflow (Disputed Range):** `status: disputed, do not use as a single input value`. Independent inquiry estimate: ~13,027 $\text{m}^3/\text{s}$ (460,000 cfs); Government estimate range: ~17,840 to 26,514 $\text{m}^3/\text{s}$ (630,000–936,000 cfs). Flagged as disputed: not collapsed to a single number or used as a single input value.
+- **Crest Elevation:** `TODO_VERIFY` (Pending official datum verification; genuinely unresolved; requires manual lookup at India-WRIS or CWC NRLD PDF).
+- **Dam Location Coordinates:** `TODO_VERIFY` (Genuinely unresolved; not found via search; requires manual lookup at India-WRIS Machhu_II_Dam_D01498 or CWC NRLD PDF).
 - **Breach Geometry:** Overtopping and piping scenarios modeled parametrically.
 - **Topography:** Copernicus 30m Global DEM (GLO-30) assumed as base elevation. Coarse bathymetry assumed flat/interpolated.
 
