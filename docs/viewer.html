@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DamSight - Decision-Grade Inundation & Dam Breach Presentation Viewer</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #182234;
+      --border-color: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-blue: #38bdf8;
+      --accent-indigo: #818cf8;
+      --accent-green: #34d399;
+      --accent-amber: #fbbf24;
+      --accent-red: #f87171;
+      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-stack);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      font-weight: 700;
+      background: #0369a1;
+      color: #e0f2fe;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .honesty-pill-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid transparent;
+    }
+
+    .pill-red {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    .pill-amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fcd34d;
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+
+    .pill-indigo {
+      background: rgba(99, 102, 241, 0.15);
+      color: #c7d2fe;
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .pill-green {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border-color: rgba(16, 185, 129, 0.4);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .tab-btn:hover {
+      background: #273549;
+      color: #ffffff;
+    }
+
+    .tab-btn.active {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #38bdf8;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    @media (min-width: 900px) {
+      .grid-2col {
+        grid-template-columns: 65% 35%;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    .figure-frame {
+      background: #0b1120;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px;
+      text-align: center;
+    }
+
+    .figure-frame img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .meta-list {
+      list-style: none;
+      font-size: 13px;
+    }
+
+    .meta-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .meta-list li:last-child {
+      border-bottom: none;
+    }
+
+    .meta-label {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .meta-value {
+      font-weight: 600;
+      color: #ffffff;
+      text-align: right;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .alert-box {
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-top: 16px;
+      line-height: 1.45;
+    }
+
+    .alert-amber {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fde68a;
+    }
+
+    .alert-red {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fecaca;
+    }
+
+    .alert-blue {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #bae6fd;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 12px;
+    }
+
+    table.data-table th, table.data-table td {
+      padding: 8px 10px;
+      border: 1px solid var(--border-color);
+      text-align: left;
+    }
+
+    table.data-table th {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      font-weight: 700;
+    }
+
+    table.data-table tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge-pass {
+      background: #065f46;
+      color: #6ee7b7;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+
+    .badge-verified {
+      background: #1e3a8a;
+      color: #93c5fd;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+
+    .badge-roadmap {
+      background: #475569;
+      color: #cbd5e1;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+
+    .badge-ran {
+      background: #78350f;
+      color: #fcd34d;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .stat-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: #ffffff;
+      margin: 4px 0;
+    }
+
+    .stat-note {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    footer {
+      border-top: 1px solid var(--border-color);
+      margin-top: 40px;
+      padding-top: 20px;
+      color: var(--text-muted);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div>
+        <div class="brand-title">
+          DamSight
+          <span class="brand-badge">Offline Presentation Viewer</span>
+        </div>
+        <div class="subtitle">
+          Hindcast Analysis & 2D Hydrodynamic Flood Routing — 1979 Machhu-II Dam Break (Morbi, Gujarat)
+        </div>
+      </div>
+      <div class="honesty-pill-bar">
+        <span class="pill pill-red">Dam Parameters UNVERIFIED</span>
+        <span class="pill pill-indigo">Mesh: 120 m Triangular</span>
+        <span class="pill pill-amber">Qualitative Check: 1 Open Discrepancy</span>
+        <span class="pill pill-green">Mass Conserved: 0.0022% Error</span>
+      </div>
+    </header>
+
+    <!-- Top KPI Stats -->
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="stat-title">Breach Outflow Peak</div>
+        <div class="stat-value">15,008 m³/s</div>
+        <div class="stat-note">Dynamic Froehlich Overtopping Model (t=2.50 hr)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Mass Balance Error</div>
+        <div class="stat-value">0.0022%</div>
+        <div class="stat-note">Gate &le; 5.0% &rarr; PASS (101.02 Mm³ inflow)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">High-Ground Dry Mass</div>
+        <div class="stat-value">100.00%</div>
+        <div class="stat-note">Zero spurious wetting on terrain &gt; 70 m MSL</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Thalweg Monotonicity</div>
+        <div class="stat-value">0 Violations</div>
+        <div class="stat-note">Evaluated over 15 hydraulic transects to domain exit</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-depth')">1. Peak Depth Map</button>
+      <button class="tab-btn" onclick="switchTab('tab-arrival')">2. Arrival Isochrones</button>
+      <button class="tab-btn" onclick="switchTab('tab-hydro')">3. Breach Hydrograph</button>
+      <button class="tab-btn" onclick="switchTab('tab-profile')">4. Validation Profile</button>
+      <button class="tab-btn" onclick="switchTab('tab-exposure')">5. Exposure Overlay</button>
+      <button class="tab-btn" onclick="switchTab('tab-benchmarks')">6. Solver Benchmarks</button>
+      <button class="tab-btn" onclick="switchTab('tab-dam')">7. Dam Identification</button>
+      <button class="tab-btn" onclick="switchTab('tab-roadmap')">8. Scope & Roadmap</button>
+    </div>
+
+    <!-- TAB 1: Peak Depth Map -->
+    <div id="tab-depth" class="tab-content active">
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-title">
+            <span>2D Peak Inundation Depth over Hillshade (ANUGA 4.0.0)</span>
+            <span class="pill pill-indigo">120 m Mesh</span>
+          </div>
+          <div class="figure-frame">
+            <img src="SLIDE_FIGURES/01_max_depth_hillshade.png" alt="Maximum Depth Map over Hillshade">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Hydraulic Simulation Summary</div>
+          <ul class="meta-list">
+            <li><span class="meta-label">Site:</span><span class="meta-value">Machhu-II (Morbi, Gujarat)</span></li>
+            <li><span class="meta-label">Domain Bounds:</span><span class="meta-value">25.0 km &times; 25.1 km (EPSG:32642)</span></li>
+            <li><span class="meta-label">Triangular Mesh:</span><span class="meta-value">173,888 cells</span></li>
+            <li><span class="meta-label">Simulated Duration:</span><span class="meta-value">6.62 hours (23,815 s)</span></li>
+            <li><span class="meta-label">Wall-Clock Execution:</span><span class="meta-value">7.14 min (Local CPU)</span></li>
+            <li><span class="meta-label">Peak Inundation Depth:</span><span class="meta-value">15.42 m</span></li>
+            <li><span class="meta-label">Peak Flow Velocity:</span><span class="meta-value">7.87 m/s</span></li>
+            <li><span class="meta-label">Mass Conservation:</span><span class="meta-value">0.0022% error (PASS)</span></li>
+          </ul>
+          <div class="alert-box alert-blue">
+            <strong>Hydraulic Flow Pattern:</strong> The flood wave remains confined inside the incised Machhu canyon upstream of Morbi with water depths reaching 15.4 m, then spreads across the low-lying alluvial plains surrounding Morbi city.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Arrival Isochrones -->
+    <div id="tab-arrival" class="tab-content">
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-title">
+            <span>Flood Wave Arrival Isochrones (30-Minute Contours)</span>
+            <span class="pill pill-indigo">120 m Mesh</span>
+          </div>
+          <div class="figure-frame">
+            <img src="SLIDE_FIGURES/02_arrival_time_isochrones.png" alt="Arrival Time Map with Isochrones">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Wave Kinematics & Tracking</div>
+          <ul class="meta-list">
+            <li><span class="meta-label">Reference Time Zero (t=0):</span><span class="meta-value">Breach Inception</span></li>
+            <li><span class="meta-label">Arrival Threshold:</span><span class="meta-value">depth &gt; 0.10 m</span></li>
+            <li><span class="meta-label">First Toe Wetting:</span><span class="meta-value">7.28 min post t=0</span></li>
+            <li><span class="meta-label">Arrival at 5 km Outskirts:</span><span class="meta-value">76.7 min (52.2m wave transit)</span></li>
+            <li><span class="meta-label">Arrival at Morbi City:</span><span class="meta-value">101.5 min (~1.7 hr)</span></li>
+            <li><span class="meta-label">Domain Northern Exit:</span><span class="meta-value">186.8 min (~3.1 hr)</span></li>
+            <li><span class="meta-label">Isochrone Step:</span><span class="meta-value">30 minutes</span></li>
+          </ul>
+          <div class="alert-box alert-amber">
+            <strong>Arrival Time Reference:</strong> The arrival contours measure total elapsed time since overtopping breach initiation ($t=0$). The front reaches the industrial outskirts in ~1.3 hours and central Morbi in ~1.7 hours.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Breach Hydrograph -->
+    <div id="tab-hydro" class="tab-content">
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-title">
+            <span>Real Breach Outflow Hydrograph (cache/site_a/hydrograph.csv)</span>
+            <span class="pill pill-green">Mass Conserved: 0.0000%</span>
+          </div>
+          <div class="figure-frame">
+            <img src="SLIDE_FIGURES/03_breach_hydrograph_real.png" alt="Real Breach Outflow Hydrograph">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Breach Formulation & Provenance</div>
+          <ul class="meta-list">
+            <li><span class="meta-label">Model Formulation:</span><span class="meta-value">Froehlich (2008) Overtopping</span></li>
+            <li><span class="meta-label">Dam Height (h_b):</span><span class="meta-value">22.56 m (UNVERIFIED)</span></li>
+            <li><span class="meta-label">Reservoir Storage (V_w):</span><span class="meta-value">101.02 Mm³ (UNVERIFIED)</span></li>
+            <li><span class="meta-label">Crest Elevation:</span><span class="meta-value">61.0 m MSL (DEM-sampled)</span></li>
+            <li><span class="meta-label">Average Width (B_avg):</span><span class="meta-value">144.83 m</span></li>
+            <li><span class="meta-label">Formation Time (t_f):</span><span class="meta-value">2.50 hr (8,991.3 s)</span></li>
+            <li><span class="meta-label">Peak Outflow (Q_peak):</span><span class="meta-value">15,008.1 m³/s</span></li>
+            <li><span class="meta-label">Empirical Froehlich Q_p:</span><span class="meta-value">6,647.1 m³/s</span></li>
+            <li><span class="meta-label">Peak Ratio vs Froehlich:</span><span class="meta-value">2.2579 (stored in JSON)</span></li>
+            <li><span class="meta-label">Outside Empirical Band:</span><span class="meta-value">true (stored in JSON)</span></li>
+            <li><span class="meta-label">Mass Balance Error:</span><span class="meta-value">0.0000%</span></li>
+          </ul>
+          <div class="alert-box alert-amber">
+            <strong>Calibration Caveat:</strong> Weir discharge coefficients $C_{d,\text{rect}} = 1.70$ and $C_{d,\text{tri}} = 1.35$ are <strong>DEFAULTED (unsourced calibration)</strong> per <code>ASSUMPTIONS.md</code>, as exact hydraulic coefficients are not empirically calibrated for evolving embankment breaches.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: Validation Profile -->
+    <div id="tab-profile" class="tab-content">
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-title">
+            <span>Longitudinal Thalweg Profile & Qualitative Sanity Check</span>
+            <span class="pill pill-amber">Status: RAN (1 Open Discrepancy)</span>
+          </div>
+          <div class="figure-frame">
+            <img src="SLIDE_FIGURES/04_thalweg_profile_validation.png" alt="Thalweg Profile and Historical Check">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Historical Checkpoints (1979 Record)</div>
+          
+          <div style="margin-bottom: 16px;">
+            <div style="font-weight: 700; color: #ffffff; font-size: 13px; margin-bottom: 4px;">Checkpoint 1: Flood Depth at Morbi</div>
+            <ul class="meta-list">
+              <li><span class="meta-label">Inquiry Report Range:</span><span class="meta-value">3.7 to 9.1 m (12-30 ft)</span></li>
+              <li><span class="meta-label">Simulated Thalweg Depth:</span><span class="meta-value">9.93 m</span></li>
+              <li><span class="meta-label">Simulated Channel Max:</span><span class="meta-value">10.53 m</span></li>
+              <li><span class="meta-label">Simulated Reach Average:</span><span class="meta-value">5.11 m</span></li>
+              <li><span class="meta-label">Assessment:</span><span class="meta-value badge-ran">PARTIAL OVERLAP</span></li>
+            </ul>
+            <div class="alert-box alert-blue" style="margin-top: 6px;">
+              <strong>Depth Assessment:</strong> Partial overlap: simulated 7.7-10.5 m is at/above the high end of the reported 3.7-9.1 m; reach average 5.11 m; qualitative check only, not calibrated.
+            </div>
+          </div>
+
+          <div>
+            <div style="font-weight: 700; color: #ffffff; font-size: 13px; margin-bottom: 4px;">Checkpoint 2: Arrival Timing Discrepancy</div>
+            <ul class="meta-list">
+              <li><span class="meta-label">Historical Citation:</span><span class="meta-value">~20 min at ~5 km (Wikipedia)</span></li>
+              <li><span class="meta-label">Simulated Wave Arrival:</span><span class="meta-value">76.7 min post t=0</span></li>
+              <li><span class="meta-label">Simulated Wave Transit:</span><span class="meta-value">52.2 min from dam toe</span></li>
+              <li><span class="meta-label">Discrepancy Ratio:</span><span class="meta-value">~2.6x to 3.8x slower</span></li>
+              <li><span class="meta-label">Status:</span><span class="meta-value badge-ran">OPEN DISCREPANCY</span></li>
+            </ul>
+            <div class="alert-box alert-amber" style="margin-top: 6px;">
+              <strong>Hypothesized Root Causes (DECISIONS.md O2):</strong>
+              The genuine discrepancy between the simulated 76.7 min and historical ~20 min is attributed to two factors (<strong>likely contributors, not isolated or tested</strong>):
+              <ol style="margin-left: 18px; margin-top: 4px;">
+                <li><strong>Reference Time Zero:</strong> Simulation begins at overtopping inception with 2.5h gradual breach formation ($Q < 100\text{ m}^3/\text{s}$ for first 16 min), while eyewitnesses timed from the sudden collapse.</li>
+                <li><strong>Mesh Resolution:</strong> 120m cell averaging numerically widens the narrow channel and increases early storage dampening.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: Exposure Overlay -->
+    <div id="tab-exposure" class="tab-content">
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-title">
+            <span>Infrastructure Exposure Overlay</span>
+            <span class="pill pill-red">NOT Evacuation Routing</span>
+          </div>
+          <div class="figure-frame">
+            <img src="SLIDE_FIGURES/05_exposure_overlay.png" alt="Infrastructure Exposure Overlay">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Spatial Intersection Statistics</div>
+          <ul class="meta-list">
+            <li><span class="meta-label">Total Buildings Ingested:</span><span class="meta-value">1,672 features</span></li>
+            <li><span class="meta-label">Total Roads Ingested:</span><span class="meta-value">3,179 segments</span></li>
+            <li><span class="meta-label">Buildings with Depth &gt; 0.3 m:</span><span class="meta-value">94 (5.6%)</span></li>
+            <li><span class="meta-label">Roads with Centroid Depth &gt; 0.3 m:</span><span class="meta-value">188 (5.9%)</span></li>
+            <li><span class="meta-label">Evacuation Network Analysis:</span><span class="meta-value">NOT IMPLEMENTED</span></li>
+          </ul>
+          <div class="alert-box alert-red">
+            <strong>Honest Scope Boundary:</strong> This map represents a <strong>simple static spatial overlay only</strong>. Network traversal, flood arrival closure times, and settlement evacuation categorization (<code>can_evacuate</code>, <code>tight</code>, <code>trapped</code>) are pending under Roadmap Step 6 and are NOT implemented.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: Solver Benchmarks -->
+    <div id="tab-benchmarks" class="tab-content">
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-title">
+            <span>Analytical Dam-Break Benchmarks (Ritter 1892 & Stoker 1957)</span>
+            <span class="pill pill-green">All Gates VERIFIED</span>
+          </div>
+          <div class="figure-frame">
+            <img src="SLIDE_FIGURES/benchmark_ritter_stoker.png" alt="Ritter and Stoker Benchmark Comparisons">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Stored Verification Gate Table (PERFORMANCE.md)</div>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">
+            Exact values read from <code>demo_data/benchmarks/ritter_stoker_results.json</code>:
+          </p>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Gate ID</th>
+                <th>Target Threshold</th>
+                <th>Ritter (Dry Bed)</th>
+                <th>Stoker (Wet Bed)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>G1-a</strong> (Front Pos Error)</td>
+                <td>&le; 5.0% at &Delta;x=5m</td>
+                <td>0.89%</td>
+                <td>0.78%</td>
+                <td><span class="badge-verified">VERIFIED</span></td>
+              </tr>
+              <tr>
+                <td><strong>G1-b</strong> (L1 Depth Error)</td>
+                <td>&le; 5.0% at &Delta;x=5m</td>
+                <td>0.64%</td>
+                <td>0.72%</td>
+                <td><span class="badge-verified">VERIFIED</span></td>
+              </tr>
+              <tr>
+                <td><strong>G1-c</strong> (Convergence Order)</td>
+                <td>Monotonic p &gt; 0</td>
+                <td>p = 0.90</td>
+                <td>p = 0.84</td>
+                <td><span class="badge-verified">VERIFIED</span></td>
+              </tr>
+              <tr>
+                <td><strong>G1-d</strong> (Max Front Error)</td>
+                <td>&le; 3 cells (15.0 m)</td>
+                <td>10.0 m (&le; 15 m)</td>
+                <td>5.0 m (&le; 15 m)</td>
+                <td><span class="badge-verified">VERIFIED</span></td>
+              </tr>
+              <tr>
+                <td><strong>Secondary Solver</strong></td>
+                <td>Delft3D FM Baseline</td>
+                <td>not stored</td>
+                <td>not stored</td>
+                <td><span class="badge-roadmap">DROPPED (D6)</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="alert-box alert-blue">
+            <strong>Solver Baseline & Hardware Decision (D6):</strong> Delft3D FM was dropped under Decision D6 and Open Item O1 due to hardware constraints (4 cores, 7.6 GB RAM). ANUGA 4.0.0 is the sole verified hydrodynamic solver for Site A.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 7: Dam Identification -->
+    <div id="tab-dam" class="tab-content">
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-title">
+            <span>Visual Dam Location Identification on Copernicus 30m DEM</span>
+            <span class="pill pill-red">Dam Parameters UNVERIFIED</span>
+          </div>
+          <div class="figure-frame">
+            <img src="SLIDE_FIGURES/machhu2_dam_location_identified.png" alt="Dam Location Visual Identification">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Terrain Provenance & Identified Coordinates</div>
+          <ul class="meta-list">
+            <li><span class="meta-label">Identified Channel Crossing:</span><span class="meta-value">[691350.0, 2518500.0] UTM 42N</span></li>
+            <li><span class="meta-label">Channel Bed Elevation:</span><span class="meta-value">44.64 m MSL</span></li>
+            <li><span class="meta-label">Embankment Crest Shoulder:</span><span class="meta-value">[691270.0, 2518200.0] UTM 42N</span></li>
+            <li><span class="meta-label">DEM Sampled Crest Elevation:</span><span class="meta-value">61.0 m MSL</span></li>
+            <li><span class="meta-label">Offset from Morbi City:</span><span class="meta-value">~9.0 km upstream</span></li>
+            <li><span class="meta-label">Conditioned DEM Voids:</span><span class="meta-value">0.000% (Wang & Liu 2006)</span></li>
+          </ul>
+          <div class="alert-box alert-amber">
+            <strong>Ground Rule 3 Compliance:</strong> All dam physical attributes remain <code>verified: false</code> until officially certified by dam authorities. Crest elevation is sampled from DEM bathymetry, and location is visually identified.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 8: Scope & Roadmap -->
+    <div id="tab-roadmap" class="tab-content">
+      <div class="card">
+        <div class="card-title">
+          <span>Complete Demo Story Scope Matrix (SPEC Section 3)</span>
+          <span class="pill pill-amber">Full MVP Scope NOT Met</span>
+        </div>
+        <table class="data-table" style="font-size: 13px;">
+          <thead>
+            <tr>
+              <th style="width: 15%;">Story Step</th>
+              <th style="width: 20%;">Implementation Status</th>
+              <th style="width: 25%;">Execution Grounding</th>
+              <th>Honest Scope & Presentation Boundary</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Step 1: Watch</strong></td>
+              <td><span class="badge-roadmap">NOT IMPLEMENTED</span></td>
+              <td><code>src/damsight/watch/</code> (__init__.py only)</td>
+              <td>Satellite blockage detection & GEE lake monitoring out of scope (Milestone 9).</td>
+            </tr>
+            <tr>
+              <td><strong>Step 2: Pick Site</strong></td>
+              <td><span class="badge-pass">PASS</span></td>
+              <td>Real Config & Froehlich Engine</td>
+              <td>Machhu-II parameters loaded with explicit unverified tags; dynamic hydrograph generated.</td>
+            </tr>
+            <tr>
+              <td><strong>Step 3: Physics Result</strong></td>
+              <td><span class="badge-pass">PASS</span></td>
+              <td>Precomputed 2D ANUGA Run</td>
+              <td>Real 6.62h simulation on 173,888 triangles; mass balance error 0.0022%, high-ground dry mass 100%.</td>
+            </tr>
+            <tr>
+              <td><strong>Step 4: Uncertainty</strong></td>
+              <td><span class="badge-roadmap">NOT IMPLEMENTED</span></td>
+              <td><code>src/damsight/ensemble/</code> (__init__.py only)</td>
+              <td>Monte Carlo ensembles and probabilistic rasters (P_flood) pending (Milestone 8).</td>
+            </tr>
+            <tr>
+              <td><strong>Step 5: ML Surrogate</strong></td>
+              <td><span class="badge-roadmap">NOT IMPLEMENTED</span></td>
+              <td><code>src/damsight/surrogate/</code> (__init__.py only)</td>
+              <td>Neural surrogate sliders for instant what-if inference pending (Milestone 6).</td>
+            </tr>
+            <tr>
+              <td><strong>Step 6: Evacuation</strong></td>
+              <td><span class="badge-roadmap">NOT IMPLEMENTED</span></td>
+              <td><code>src/damsight/evac/</code> (__init__.py only)</td>
+              <td>Vector exposure ingested and overlaid; network graph routing and road closure times pending (Milestone 8).</td>
+            </tr>
+            <tr>
+              <td><strong>Step 7: Benchmarks</strong></td>
+              <td><span class="badge-pass">PASS</span></td>
+              <td>Exact Ritter & Stoker Gates</td>
+              <td>ANUGA vs analytical solutions VERIFIED on L1 error, front position, and spatial convergence.</td>
+            </tr>
+            <tr>
+              <td><strong>Step 9: Validation</strong></td>
+              <td><span class="badge-ran">RAN: qualitative check</span></td>
+              <td>Historical Sanity Check (O2)</td>
+              <td>Depth shows partial overlap (7.7-10.5m vs 3.7-9.1m); arrival time has 1 open discrepancy (76.7m vs ~20m).</td>
+            </tr>
+            <tr>
+              <td><strong>Step 10: Export</strong></td>
+              <td><span class="badge-ran">PARTIAL (GeoTIFF only)</span></td>
+              <td>Solver GeoTIFF Exporter</td>
+              <td>GeoTIFF rasters complete and verified; vector Shapefile (.shp) and KML export pending (Milestone 11).</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div>DamSight: Physics-Grounded Dam Breach Inundation & Decision Support System</div>
+      <div>Freeze Tag: <code>demo-freeze-v3</code> | Tested on 4 cores, 7.6 GB RAM</div>
+    </footer>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      const target = document.getElementById(tabId);
+      if (target) {
+        target.classList.add('active');
+      }
+
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => 
+        btn.getAttribute('onclick').includes(tabId)
+      );
+      if (activeBtn) {
+        activeBtn.classList.add('active');
+      }
+    }
+  </script>
+</body>
+</html>
