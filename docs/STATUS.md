@@ -1,7 +1,7 @@
 # Project Status: DamSight
 
-**Current Phase:** Honest-Descope Presentation Freeze (tag `demo-freeze-v1`)  
-**Scope Status:** **Full MVP Scope NOT Met.** Core hydrodynamic pipeline complete (Steps 2, 3, 7, 9); Story steps 1, 4, 5, 6 and vector export NOT implemented.  
+**Current Phase:** Honest-Descope Presentation Freeze (tag `demo-freeze-v2`)  
+**Scope Status:** **Full MVP Scope NOT Met.** Core hydrodynamic pipeline complete (Steps 2, 3, 7); Step 9 RAN (qualitative check, 1 open discrepancy); Story steps 1, 4, 5, 6 and vector export NOT implemented.  
 **Last Updated:** September 28, 2026  
 **Active Conda Environment:** `damsight` (Python 3.11.16, ANUGA 4.0.0 on Windows from conda-forge)  
 **Test Suite Status:** 64 collected (64 passing in full run in ~200s, 57 passing / 7 deselected with `-m "not slow"` in ~18s)  
