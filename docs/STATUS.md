@@ -1,9 +1,10 @@
 # Project Status: DamSight
 
-**Current Phase:** Milestone 3 (M3b Real Complete, tag `m3b-real-pass`)  
-**Last Updated:** September 27, 2026  
-**Active Conda Environment:** `damsight` (Python 3.11.16, ANUGA 4.0.0 installs natively on Windows from conda-forge; env = damsight (py3.11))  
-**Test Suite Status:** 64 collected (64 passing in full run in 200.86s, 57 passing / 7 deselected with `-m "not slow"` in 18.14s)  
+**Current Phase:** Honest-Descope Presentation Freeze (tag `demo-freeze-v1`)  
+**Scope Status:** **Full MVP Scope NOT Met.** Core hydrodynamic pipeline complete (Steps 2, 3, 7, 9); Story steps 1, 4, 5, 6 and vector export NOT implemented.  
+**Last Updated:** September 28, 2026  
+**Active Conda Environment:** `damsight` (Python 3.11.16, ANUGA 4.0.0 on Windows from conda-forge)  
+**Test Suite Status:** 64 collected (64 passing in full run in ~200s, 57 passing / 7 deselected with `-m "not slow"` in ~18s)  
 **Linter & Type Checking Status:** Ruff (Clean), Black (Formatted), MyPy (`solvers/base.py` Clean)  
 
 ---
@@ -155,33 +156,29 @@
   - `run_meta.json` (metadata & configuration)
   - `m3b_evaluation_report.json` (full quantitative gate evaluation report)
 - **Regression Guard:** 57 passed, 7 deselected with `pytest -m "not slow"` in 18.14s.
+## 5. Scope Boundaries & Unimplemented Modules (Honest Descope Freeze)
 
----
+**CRITICAL HONESTY DECLARATION: Full MVP scope is NOT met.**
+The core hydrodynamic pipeline is complete, tested, and verified on real physics and real terrain (Steps 2, 3, 7, 9).
+However, Demo Story steps 1, 4, 5, 6, and the vector export part of Step 10 are **NOT IMPLEMENTED** and are presented strictly as roadmap targets:
 
-## 5. Scope Boundaries & Unimplemented Modules (as of M3b Freeze)
+1. **Step 1: Watch Stage (`src/damsight/watch/`):**
+   - **Status:** **NOT IMPLEMENTED (Roadmap Milestone 9)**.
+   - Contains `__init__.py` only. No satellite blockage detection or automated Sentinel/GEE lake monitoring.
+2. **Step 4: Uncertainty (`src/damsight/ensemble/`):**
+   - **Status:** **NOT IMPLEMENTED (Roadmap Milestone 8)**.
+   - Contains `__init__.py` only. No Monte Carlo ensemble sampling or probabilistic flood rasters ($P_{\text{flood}}$).
+3. **Step 5: Instant What-If / ML Surrogate (`src/damsight/surrogate/`):**
+   - **Status:** **NOT IMPLEMENTED (Roadmap Milestone 6)**.
+   - Contains `__init__.py` only. No neural surrogate model or interactive real-time slider inference.
+4. **Step 6: Evacuation Routing (`src/damsight/evac/`):**
+   - **Status:** **NOT IMPLEMENTED (Roadmap Milestone 8)**.
+   - Contains `__init__.py` only. While vector exposure data (roads, buildings, places) has been ingested and can be overlaid statically, network graph routing, flood arrival closure times, and settlement evacuation categorization (`can_evacuate`, `tight`, `trapped`) are pending.
+5. **Step 10: Multi-Format Vector Export (`src/damsight/export/`):**
+   - **Status:** **PARTIAL (GeoTIFF Complete, Vector NOT IMPLEMENTED)**.
+   - Analysis GeoTIFF rasters (`max_depth.tif`, `max_velocity.tif`, `arrival_time.tif`, `hazard.tif`) are fully generated and verified. However, vector Shapefile (`.shp`) and Keyhole Markup (`.kml`) export pipelines remain stubbed with `__init__.py` only (Milestone 11).
+6. **API Backend (`src/damsight/api/`) & Web Dashboard (`webapp/`):**
+   - **Status:** **NOT IMPLEMENTED**.
+   - Contains `__init__.py` and `README.md` respectively. Live presentation runs via offline verification script and packaged presentation figures.
 
-In strict accordance with Ground Rule 2 and Section 3 of `docs/SPEC.md`, the following modules and features are **NOT IMPLEMENTED** (remain stubbed with `__init__.py` or placeholders only):
-
-1. **Machhu-I Dam (Upstream Chain Dam):**
-   - Config fields remain `TODO_VERIFY` in `configs/sites/site_a.yaml`.
-   - Ingestion and breach simulation have not been run for Machhu-I.
-2. **Export Engine (`src/damsight/export/`):**
-   - Contains `__init__.py` only. Standard GeoTIFF exports are generated directly by solver adapters, but vector export pipelines (.shp, .kml) are not yet implemented.
-3. **API Backend (`src/damsight/api/`):**
-   - Contains `__init__.py` only. FastAPI routes, geojson endpoints, and raster tiling are not yet implemented.
-4. **Web Dashboard (`webapp/`):**
-   - Contains `README.md` only. React / MapLibre GL frontend is not yet built.
-5. **ML Surrogate Model (`src/damsight/surrogate/`):**
-   - Contains `__init__.py` only. Target for Milestone 6.
-6. **Cascade Failure Module (`src/damsight/cascade/`):**
-   - Contains `__init__.py` only. Target for Milestone 7.
-7. **Evacuation Routing & Feasibility (`src/damsight/evac/`):**
-   - Contains `__init__.py` only. Target for Milestone 8.
-8. **Ensemble & Uncertainty Quantification (`src/damsight/ensemble/`):**
-   - Contains `__init__.py` only. Target for Milestone 8.
-9. **Satellite Watch & GEE Integration (`src/damsight/watch/`):**
-   - Contains `__init__.py` only. Out of scope for base MVP demo (Milestone 9).
-10. **Automated Validation Module (`src/damsight/validate/`):**
-    - Contains `__init__.py` only. Out of scope for base MVP demo (Milestone 10).
-
-*Summary Assessment:* All the above modules remain stubbed with `__init__.py` only per the last audit. This is entirely expected given the MVP freeze scope targeting foundational hydrodynamic core Milestones (M0-M3b complete, M4-M8 remaining roadmap target, and M9-M12 out of scope). Milestones 0 through 3 (Config, Ingestion, Breach Hydrograph, and 2D Hydrodynamic Solver) are fully implemented, tested, and validated against their respective gates.
+*Summary Assessment:* The core hydrodynamic simulation pipeline (Config -> Ingestion -> Froehlich Breach -> 2D ANUGA Hydrodynamics -> Historical Sanity Check) is 100% complete and numerically verified. All other scope items remain roadmap targets and are never presented as completed.

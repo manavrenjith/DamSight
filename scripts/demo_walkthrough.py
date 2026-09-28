@@ -74,14 +74,14 @@ def run_walkthrough():
     watch_module = project_root / "src" / "damsight" / "watch" / "__init__.py"
     
     if not site_b_config.exists():
-        print("  [STUBBED] configs/sites/site_b.yaml does not exist.")
-        print("  [STUBBED] src/damsight/watch/ contains __init__.py only.")
+        print("  [NOT IMPLEMENTED (roadmap)] configs/sites/site_b.yaml does not exist.")
+        print("  [NOT IMPLEMENTED (roadmap)] src/damsight/watch/ contains __init__.py only.")
         print("  [STATUS] Out of scope for base MVP freeze (Target: Milestone 9).")
         results["Step 1 (Watch)"] = {
-            "status": "STUBBED",
+            "status": "NOT IMPLEMENTED (roadmap)",
             "time_s": time.perf_counter() - t0,
             "offline_clean": True,
-            "notes": "Stubbed (M9 scope). No network calls made.",
+            "notes": "Not implemented (M9 scope). No network calls made.",
         }
     else:
         results["Step 1 (Watch)"] = {"status": "PASS", "time_s": time.perf_counter() - t0}
@@ -204,13 +204,13 @@ def run_walkthrough():
     print_banner("Step 4: Uncertainty (Monte Carlo Ensemble & Confidence Bounds)")
     print("Expected: Flood probability layer (P_flood) and 10th/50th/90th percentile arrival times.")
     ensemble_module = project_root / "src" / "damsight" / "ensemble" / "__init__.py"
-    print("  [STUBBED] src/damsight/ensemble/ contains __init__.py only.")
+    print("  [NOT IMPLEMENTED (roadmap)] src/damsight/ensemble/ contains __init__.py only.")
     print("  [STATUS] Out of scope for base MVP freeze (Target: Milestone 8).")
     results["Step 4 (Uncertainty)"] = {
-        "status": "STUBBED",
+        "status": "NOT IMPLEMENTED (roadmap)",
         "time_s": time.perf_counter() - t0,
         "offline_clean": True,
-        "notes": "Stubbed (M8 scope). No network calls made.",
+        "notes": "Not implemented (M8 scope). No network calls made.",
     }
 
     # =========================================================================
@@ -220,13 +220,13 @@ def run_walkthrough():
     print_banner("Step 5: Instant What-If (Calibrated ML Surrogate Model)")
     print("Expected: Sub-second interactive slider updates with error bounds badge.")
     surrogate_module = project_root / "src" / "damsight" / "surrogate" / "__init__.py"
-    print("  [STUBBED] src/damsight/surrogate/ contains __init__.py only.")
+    print("  [NOT IMPLEMENTED (roadmap)] src/damsight/surrogate/ contains __init__.py only.")
     print("  [STATUS] Out of scope for base MVP freeze (Target: Milestone 6).")
     results["Step 5 (Surrogate)"] = {
-        "status": "STUBBED",
+        "status": "NOT IMPLEMENTED (roadmap)",
         "time_s": time.perf_counter() - t0,
         "offline_clean": True,
-        "notes": "Stubbed (M6 scope). No network calls made.",
+        "notes": "Not implemented (M6 scope). No network calls made.",
     }
 
     # =========================================================================
@@ -243,13 +243,13 @@ def run_walkthrough():
     print(f"    - Roads GeoJSON:     {'Present (3,179 features)' if roads_path.exists() else 'Missing'}")
     print(f"    - Buildings GeoJSON: {'Present (1,672 features)' if bldgs_path.exists() else 'Missing'}")
     print(f"    - Places GeoJSON:    {'Present (31 features)' if places_path.exists() else 'Missing'}")
-    print("  [STUBBED] src/damsight/evac/ contains __init__.py only.")
+    print("  [NOT IMPLEMENTED (roadmap)] src/damsight/evac/ contains __init__.py only.")
     print("  [STATUS] Out of scope for base MVP freeze (Target: Milestone 8).")
     results["Step 6 (Evacuation)"] = {
-        "status": "STUBBED",
+        "status": "NOT IMPLEMENTED (roadmap)",
         "time_s": time.perf_counter() - t0,
         "offline_clean": True,
-        "notes": "Stubbed (M8 scope). Vector exposure data ingested, routing engine pending.",
+        "notes": "Not implemented (M8 scope). Vector exposure data ingested, routing engine pending.",
     }
 
     # =========================================================================
@@ -327,29 +327,35 @@ def run_walkthrough():
     
     export_module = project_root / "src" / "damsight" / "export" / "__init__.py"
     print(f"  Vector Shapefile (.shp) & Keyhole Markup (.kml) Export:")
-    print(f"    - [STUBBED] src/damsight/export/ contains __init__.py only.")
+    print(f"    - [NOT IMPLEMENTED (roadmap)] src/damsight/export/ contains __init__.py only.")
     print(f"    - [STATUS] Out of scope for base MVP freeze (Target: Milestone 11).")
 
     results["Step 10 (Export)"] = {
-        "status": "PARTIAL (GeoTIFFs PASS, Vector STUBBED)",
+        "status": "PARTIAL: GeoTIFF only, no SHP/KML",
         "time_s": time.perf_counter() - t0,
         "offline_clean": True,
         "geotiff_count": len(geotiffs),
-        "notes": "GeoTIFF complete; vector export engine stubbed per M3b freeze.",
+        "notes": "GeoTIFF complete; vector export engine not implemented per roadmap.",
     }
 
     t_total = time.perf_counter() - t_start
 
     print_banner("Walkthrough Summary & Timing Report")
-    print(f"{'Story Step':<32} | {'Status':<12} | {'Time (s)':<10} | {'Offline Clean'}")
-    print("-" * 70)
+    print(f"{'Story Step':<30} | {'Status':<32} | {'Time (s)':<10} | {'Offline Clean'}")
+    print("-" * 88)
     for step_name, d in results.items():
         st = d["status"]
         ts = d["time_s"]
         oc = d.get("offline_clean", True)
-        print(f"{step_name:<32} | {st:<12} | {ts:8.4f}s  | {str(oc):<13}")
-    print("-" * 70)
+        print(f"{step_name:<30} | {st:<32} | {ts:8.4f}s  | {str(oc):<13}")
+    print("-" * 88)
     print(f"Total Walkthrough Wall-Clock Time: {t_total:.2f} seconds ({t_total/60:.2f} minutes)")
+    print("\n" + "=" * 88)
+    print(" ONE-LINE HONESTY SUMMARY:")
+    print(" Real working steps (executed real code on real data): Steps 2, 3, 7, 9")
+    print(" Not implemented (honest roadmap): Steps 1, 4, 5, 6")
+    print(" Partial (GeoTIFF complete, no vector SHP/KML): Step 10")
+    print("=" * 88 + "\n")
 
     return results, t_total
 

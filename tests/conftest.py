@@ -1,6 +1,4 @@
-"""DamSight: Dam Break Inundation Modelling & Decision Support System."""
-
-from __future__ import annotations
+"""Pytest configuration and environment initialization for Windows Conda environments."""
 
 import os
 import sys
@@ -24,6 +22,3 @@ if sys.platform == "win32":
     proj_lib = Path(sys.prefix) / "Library" / "share" / "proj"
     if proj_lib.exists() and "PROJ_LIB" not in os.environ:
         os.environ["PROJ_LIB"] = str(proj_lib)
-
-__version__ = "0.1.0"
-
